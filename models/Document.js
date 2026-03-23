@@ -1,10 +1,10 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
-const documentSchema = new mongoose.Schema({
+export const documentSchema = new mongoose.Schema({
   owner: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   filename: String,
   url: String,
   accessRoles: [String]
 }, { timestamps: true });
 
-module.exports = mongoose.model("Document", documentSchema);
+export default mongoose.model("Document", documentSchema);

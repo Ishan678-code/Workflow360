@@ -1,6 +1,6 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
-const performanceSchema = new mongoose.Schema({
+export const performanceSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   reviewer: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   rating: Number,
@@ -8,4 +8,4 @@ const performanceSchema = new mongoose.Schema({
   period: String
 }, { timestamps: true });
 
-module.exports = mongoose.model("PerformanceReview", performanceSchema);
+export default mongoose.model("PerformanceReview", performanceSchema);

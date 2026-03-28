@@ -9,6 +9,7 @@ import Invoice from "../models/Invoice.js";
 import User from "../models/User.js";
 import { computePerformanceScore, computeTeamPerformance } from "../services/Performanceservice.js";
 import { generateAttendanceReportPDF, generatePerformanceReportPDF } from "../services/pdfService.js";
+import { getEmployeeProfileByUserId, getFreelancerProfileByUserId } from "../utils/profileRefs.js";
 
 // ── F5.1 & F5.2 — Role-based dashboard analytics ─────────────────────────────
 export const getDashboardStats = async (req, res) => {
@@ -44,12 +45,17 @@ export const getDashboardStats = async (req, res) => {
     }
 
     if (role === "EMPLOYEE") {
+      const employeeProfile = await getEmployeeProfileByUserId(id);
+      if (!employeeProfile) {
+        return res.status(404).json({ message: "Employee profile not found" });
+      }
+
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       const [attendance, pendingLeaves, myTasks] = await Promise.all([
-        Attendance.findOne({ employee: id, date: { $gte: today } }),
-        Leave.countDocuments({ employee: id, status: "PENDING" }),
+        Attendance.findOne({ employee: employeeProfile._id, date: { $gte: today } }),
+        Leave.countDocuments({ employee: employeeProfile._id, status: "PENDING" }),
         Task.countDocuments({ assignee: id, status: { $ne: "COMPLETED" } })
       ]);
 
@@ -62,10 +68,15 @@ export const getDashboardStats = async (req, res) => {
     }
 
     if (role === "FREELANCER") {
+      const freelancerProfile = await getFreelancerProfileByUserId(id);
+      if (!freelancerProfile) {
+        return res.status(404).json({ message: "Freelancer profile not found" });
+      }
+
       const [activeProjects, pendingTimesheets, pendingInvoices, openTasks] = await Promise.all([
-        Project.countDocuments({ freelancers: id, status: "ACTIVE" }),
-        Timesheet.countDocuments({ freelancer: id, status: "PENDING" }),
-        Invoice.countDocuments({ freelancer: id, status: "PENDING" }),
+        Project.countDocuments({ freelancers: freelancerProfile._id, status: "ACTIVE" }),
+        Timesheet.countDocuments({ freelancer: freelancerProfile._id, status: "PENDING" }),
+        Invoice.countDocuments({ freelancer: freelancerProfile._id, status: "PENDING" }),
         Task.countDocuments({ assignee: id, status: { $ne: "COMPLETED" } })
       ]);
 
@@ -96,9 +107,40 @@ export const getPerformanceReport = async (req, res) => {
       ])
     ]);
 
+    const employeeUserIds = employeeTaskStats.map((entry) => entry._id).filter(Boolean);
+    const freelancerProfileIds = freelancerHourStats.map((entry) => entry._id).filter(Boolean);
+
+    const [users, freelancerProfiles] = await Promise.all([
+      User.find({ _id: { $in: employeeUserIds } }).select("name email"),
+      Freelancer.find({ _id: { $in: freelancerProfileIds } }).populate("userId", "name email"),
+    ]);
+
+    const userMap = new Map(users.map((user) => [String(user._id), user]));
+    const freelancerMap = new Map(freelancerProfiles.map((profile) => [String(profile._id), profile]));
+
+    const topEmployeesByCompletedTasks = employeeTaskStats.map((entry) => {
+      const user = userMap.get(String(entry._id));
+      return {
+        ...entry,
+        userId: entry._id,
+        name: user?.name || "Unknown User",
+        email: user?.email || "",
+      };
+    });
+
+    const topFreelancersByHoursLogged = freelancerHourStats.map((entry) => {
+      const freelancer = freelancerMap.get(String(entry._id));
+      return {
+        ...entry,
+        freelancerId: entry._id,
+        name: freelancer?.userId?.name || "Unknown Freelancer",
+        email: freelancer?.userId?.email || "",
+      };
+    });
+
     res.json({
-      topEmployeesByCompletedTasks : employeeTaskStats,
-      topFreelancersByHoursLogged  : freelancerHourStats
+      topEmployeesByCompletedTasks,
+      topFreelancersByHoursLogged
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

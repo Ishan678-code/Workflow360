@@ -1,14 +1,20 @@
 import Attendance from "../models/Attendance.js";
+import { getEmployeeProfileByUserId } from "../utils/profileRefs.js";
 
 // POST /api/attendance/clock-in
 export const clockIn = async (req, res) => {
   try {
+    const employeeProfile = await getEmployeeProfileByUserId(req.user.id);
+    if (!employeeProfile) {
+      return res.status(404).json({ message: "Employee profile not found" });
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     // Prevent double clock-in on same day
     const existing = await Attendance.findOne({
-      employee: req.user.id,
+      employee: employeeProfile._id,
       date: { $gte: today }
     });
 
@@ -17,7 +23,7 @@ export const clockIn = async (req, res) => {
     }
 
     const attendance = await Attendance.create({
-      employee : req.user.id,
+      employee : employeeProfile._id,
       date     : new Date(),
       clockIn  : new Date()
     });
@@ -31,11 +37,16 @@ export const clockIn = async (req, res) => {
 // PUT /api/attendance/clock-out
 export const clockOut = async (req, res) => {
   try {
+    const employeeProfile = await getEmployeeProfileByUserId(req.user.id);
+    if (!employeeProfile) {
+      return res.status(404).json({ message: "Employee profile not found" });
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const attendance = await Attendance.findOne({
-      employee : req.user.id,
+      employee : employeeProfile._id,
       date     : { $gte: today }
     });
 
@@ -61,8 +72,13 @@ export const clockOut = async (req, res) => {
 // GET /api/attendance/my
 export const getMyAttendance = async (req, res) => {
   try {
+    const employeeProfile = await getEmployeeProfileByUserId(req.user.id);
+    if (!employeeProfile) {
+      return res.status(404).json({ message: "Employee profile not found" });
+    }
+
     const { from, to } = req.query;
-    const filter = { employee: req.user.id };
+    const filter = { employee: employeeProfile._id };
 
     if (from || to) {
       filter.date = {};

@@ -1,4 +1,4 @@
-import React from "react";
+import { useEffect, useState } from "react";
 import EmployeeLayout from "../../layouts/EmployeeLayout";
 import { 
   FileText, 
@@ -7,6 +7,8 @@ import {
   Download,
   TrendingUp 
 } from "lucide-react";
+import { payrollApi } from "../../services/api";
+import { downloadBlob, formatCurrency, formatMonthLabel } from "../../utils/formatters";
 
 // ── Summary Card Component ──────────────────────────────────────────────────
 const SummaryCard = ({ label, amount, icon: Icon, color, bg }) => (
@@ -31,18 +33,45 @@ const StatusBadge = ({ status }) => {
     Processing: "bg-orange-50 text-orange-600 border-orange-100",
   };
   return (
-    <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider border ${styles[status]}`}>
+    <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider border Npr.{styles[status]}`}>
       {status}
     </span>
   );
 };
 
 export default function ViewPayslip() {
-  const payslips = [
-    { period: "March 2026", gross: "$8,500.00", deduct: "$1,850.00", net: "$6,650.00", status: "Processing" },
-    { period: "February 2026", gross: "$8,500.00", deduct: "$1,850.00", net: "$6,650.00", status: "Paid" },
-    { period: "January 2026", gross: "$8,500.00", deduct: "$1,850.00", net: "$6,650.00", status: "Paid" },
-  ];
+  const [payslips, setPayslips] = useState([
+    { period: "March 2026", gross: "NPR 8,500.00", deduct: "NPR 1,850.00", net: "NPR 6,650.00", status: "Processing" },
+    { period: "February 2026", gross: "NPR 8,500.00", deduct: "NPR 1,850.00", net: "NPR 6,650.00", status: "Paid" },
+  ]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadPayslips() {
+      try {
+        const data = await payrollApi.getMine();
+        if (!active) return;
+        const rows = Array.isArray(data) ? data : data?.data || [];
+        if (!rows.length) return;
+        setPayslips(rows.map((item) => ({
+          id: item._id,
+          period: formatMonthLabel(item.month),
+          gross: formatCurrency(item.grossSalary || 0),
+          deduct: formatCurrency(item.deductions || 0),
+          net: formatCurrency(item.netSalary || 0),
+          status: item.month === rows[0]?.month ? "Processing" : "Paid",
+        })));
+      } catch {}
+    }
+
+    loadPayslips();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const latest = payslips[0] || { gross: "NPR 0.00", deduct: "NPR 0.00", net: "NPR 0.00" };
 
   return (
     <EmployeeLayout>
@@ -60,21 +89,21 @@ export default function ViewPayslip() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <SummaryCard 
             label="Gross Pay" 
-            amount="$8,500.00" 
+            amount={latest.gross} 
             icon={FileText} 
             color="text-blue-600" 
             bg="bg-blue-50" 
           />
           <SummaryCard 
             label="Deductions" 
-            amount="$1,850.00" 
+            amount={latest.deduct} 
             icon={MinusCircle} 
             color="text-rose-600" 
             bg="bg-rose-50" 
           />
           <SummaryCard 
             label="Net Pay" 
-            amount="$6,650.00" 
+            amount={latest.net} 
             icon={PlusCircle} 
             color="text-emerald-600" 
             bg="bg-emerald-50" 
@@ -86,7 +115,7 @@ export default function ViewPayslip() {
           <div className="p-6 border-b border-slate-50 flex justify-between items-center">
             <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Payslip History</h2>
             <span className="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-bold text-slate-500">
-              6 payslips
+              {payslips.length} payslips
             </span>
           </div>
 
@@ -115,7 +144,16 @@ export default function ViewPayslip() {
                       <StatusBadge status={item.status} />
                     </td>
                     <td className="px-6 py-5 text-right">
-                      <button className="inline-flex items-center gap-2 text-slate-400 hover:text-blue-600 transition-colors">
+                      <button
+                        onClick={async () => {
+                          if (!item.id) return;
+                          try {
+                            const blob = await payrollApi.downloadPayslip(item.id);
+                            downloadBlob(blob, `payslip-Rs.{item.period}.pdf`);
+                          } catch {}
+                        }}
+                        className="inline-flex items-center gap-2 text-slate-400 hover:text-blue-600 transition-colors"
+                      >
                         <span className="text-[11px] font-bold">Download</span>
                         <Download size={14} />
                       </button>

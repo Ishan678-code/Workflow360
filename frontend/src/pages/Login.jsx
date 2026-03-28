@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { authApi } from "../services/api";
 
 // ── Animated bar chart ────────────────────────────────────────────────────────
 const bars = [
@@ -88,22 +89,12 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      const res  = await fetch("/api/auth/login", {
-        method  : "POST",
-        headers : { "Content-Type": "application/json" },
-        body    : JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message || "Login failed");
-        return;
-      }
+      const data = await authApi.login(email, password);
       localStorage.setItem("token", data.token);
       localStorage.setItem("user",  JSON.stringify(data.user));
       navigate(roleRoutes[data.user.role] ?? roleRoutes[selectedRole]);
-    } catch {
-      // fallback: navigate by selected role (dev / demo mode)
-      navigate(roleRoutes[selectedRole]);
+    } catch (error) {
+      setError(error.message || "Login failed");
     } finally {
       setLoading(false);
     }

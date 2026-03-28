@@ -1,10 +1,12 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import EmployeeLayout from "../../layouts/EmployeeLayout";
 import {
   ChevronDown,
   Search,
   Filter
 } from "lucide-react";
+import { taskApi } from "../../services/api";
+import { formatDate } from "../../utils/formatters";
 
 // ── Priority Badge Component ────────────────────────────────────────────────
 const PriorityBadge = ({ level }) => {
@@ -106,6 +108,36 @@ export default function MyTasks() {
     { name: "Deploy to Staging", priority: "LOW", deadline: "Mar 25, 2026", status: "To Do" },
   ]);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadTasks() {
+      try {
+        const data = await taskApi.getMyTasks();
+        if (!active) return;
+        const rows = Array.isArray(data) ? data : data?.data || [];
+        if (!rows.length) return;
+        setTasks(rows.map((task) => ({
+          id: task._id,
+          name: task.title,
+          priority: task.priority || "MEDIUM",
+          deadline: task.deadline ? formatDate(task.deadline) : "No deadline",
+          status:
+            task.status === "IN_PROGRESS"
+              ? "In Progress"
+              : task.status === "COMPLETED"
+                ? "Completed"
+                : "To Do",
+        })));
+      } catch {}
+    }
+
+    loadTasks();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const counts = {
     "To Do":       tasks.filter(t => t.status === "To Do").length,
     "In Progress": tasks.filter(t => t.status === "In Progress").length,
@@ -167,11 +199,25 @@ export default function MyTasks() {
                     <td className="px-6 py-5">
                       <StatusDropdown
                         status={task.status}
-                        onChange={(newStatus) =>
+                        onChange={async (newStatus) => {
+                          const apiStatus =
+                            newStatus === "In Progress"
+                              ? "IN_PROGRESS"
+                              : newStatus === "Completed"
+                                ? "COMPLETED"
+                                : "TODO";
+
+                          const current = tasks[idx];
                           setTasks((prev) =>
                             prev.map((t, i) => i === idx ? { ...t, status: newStatus } : t)
-                          )
-                        }
+                          );
+
+                          if (current?.id) {
+                            try {
+                              await taskApi.updateStatus(current.id, apiStatus);
+                            } catch {}
+                          }
+                        }}
                       />
                     </td>
                   </tr>

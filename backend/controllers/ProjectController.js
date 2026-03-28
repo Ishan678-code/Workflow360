@@ -1,4 +1,5 @@
 import Project from "../models/Project.js";
+import { getFreelancerProfileByUserId } from "../utils/profileRefs.js";
 
 export const createProject = async (req, res) => {
   try {
@@ -32,13 +33,17 @@ export const getProjects = async (req, res) => {
     if (status) filter.status = status;
 
     if (req.user.role === "FREELANCER") {
-      filter.freelancers = req.user.id;
+      const freelancerProfile = await getFreelancerProfileByUserId(req.user.id);
+      if (!freelancerProfile) {
+        return res.status(404).json({ message: "Freelancer profile not found" });
+      }
+      filter.freelancers = freelancerProfile._id;
     }
 
     const projects = await Project
       .find(filter)
       .populate("manager", "-password")
-      .populate("freelancers", "-password")
+      .populate({ path: "freelancers", populate: { path: "userId", select: "name email" } })
       .sort({ deadline: 1 });
 
     res.json(projects);
@@ -52,7 +57,7 @@ export const getProjectById = async (req, res) => {
     const project = await Project
       .findById(req.params.id)
       .populate("manager", "-password")
-      .populate("freelancers", "-password");
+      .populate({ path: "freelancers", populate: { path: "userId", select: "name email" } });
 
     if (!project) {
       return res.status(404).json({ message: "Project not found" });

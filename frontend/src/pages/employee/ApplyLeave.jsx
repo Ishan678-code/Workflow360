@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import EmployeeLayout from "../../layouts/EmployeeLayout";
+import { leaveApi } from "../../services/api";
+import { formatDate } from "../../utils/formatters";
 
 // ── Leave type badge ──────────────────────────────────────────────────────────
 const typeMeta = {
@@ -44,17 +46,56 @@ export default function ApplyLeave() {
   const [form, setForm]       = useState({ type: "", from: "", to: "", reason: "" });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [history]             = useState(sampleHistory);
+  const [history, setHistory] = useState(sampleHistory);
+  const [error, setError]     = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadHistory() {
+      try {
+        const data = await leaveApi.getMyLeaves();
+        if (!active) return;
+        const rows = Array.isArray(data) ? data : data?.data || [];
+        if (!rows.length) return;
+        setHistory(rows.map((item) => ({
+          type: item.type || "Leave",
+          period: item.to ? `${formatDate(item.from)} – ${formatDate(item.to)}` : formatDate(item.from),
+          reason: item.reason || "No reason provided",
+          link: false,
+        })));
+      } catch {}
+    }
+
+    loadHistory();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError("");
     try {
-      // await fetch("/api/leaves", { method:"POST", headers:{ Authorization:`Bearer ${localStorage.getItem("token")}`, "Content-Type":"application/json" }, body: JSON.stringify(form) });
-      await new Promise(r => setTimeout(r, 800)); // simulate
+      await leaveApi.apply({
+        ...form,
+        type: form.type.toUpperCase() === "ANNUAL" ? "VACATION" : form.type.toUpperCase(),
+      });
       setSuccess(true);
+      setHistory((prev) => [
+        {
+          type: form.type,
+          period: `${formatDate(form.from)} – ${formatDate(form.to)}`,
+          reason: form.reason || "No reason provided",
+          link: false,
+        },
+        ...prev,
+      ]);
       setForm({ type: "", from: "", to: "", reason: "" });
       setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      setError(err.message || "Unable to submit leave request.");
     } finally {
       setLoading(false);
     }
@@ -79,6 +120,12 @@ export default function ApplyLeave() {
           {success && (
             <div className="mb-4 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-50 border border-green-100 text-green-700 text-[12.5px] font-medium">
               <span>✓</span> Leave request submitted successfully!
+            </div>
+          )}
+
+          {error && (
+            <div className="mb-4 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 border border-red-100 text-red-700 text-[12.5px] font-medium">
+              <span>!</span> {error}
             </div>
           )}
 

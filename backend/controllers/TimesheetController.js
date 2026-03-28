@@ -1,7 +1,13 @@
 import Timesheet from "../models/Timesheet.js";
+import { getFreelancerProfileByUserId } from "../utils/profileRefs.js";
 
 export const logTime = async (req, res) => {
   try {
+    const freelancerProfile = await getFreelancerProfileByUserId(req.user.id);
+    if (!freelancerProfile) {
+      return res.status(404).json({ message: "Freelancer profile not found" });
+    }
+
     const { project, hours, date } = req.body;
 
     if (!project || !hours || !date) {
@@ -13,7 +19,7 @@ export const logTime = async (req, res) => {
     }
 
     const timesheet = await Timesheet.create({
-      freelancer: req.user.id,
+      freelancer: freelancerProfile._id,
       project,
       hours,
       date,
@@ -28,13 +34,19 @@ export const logTime = async (req, res) => {
 
 export const getMyTimesheets = async (req, res) => {
   try {
+    const freelancerProfile = await getFreelancerProfileByUserId(req.user.id);
+    if (!freelancerProfile) {
+      return res.status(404).json({ message: "Freelancer profile not found" });
+    }
+
     const { projectId } = req.query;
-    const filter = { freelancer: req.user.id };
+    const filter = { freelancer: freelancerProfile._id };
     if (projectId) filter.project = projectId;
 
     const timesheets = await Timesheet
       .find(filter)
       .populate("project", "name deadline")
+      .populate({ path: "freelancer", populate: { path: "userId", select: "name email" } })
       .sort({ date: -1 });
 
     res.json(timesheets);
@@ -54,7 +66,7 @@ export const getAllTimesheets = async (req, res) => {
 
     const timesheets = await Timesheet
       .find(filter)
-      .populate("freelancer")
+      .populate({ path: "freelancer", populate: { path: "userId", select: "name email" } })
       .populate("project", "name")
       .sort({ date: -1 });
 

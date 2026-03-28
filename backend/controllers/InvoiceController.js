@@ -1,6 +1,7 @@
 import Invoice from "../models/Invoice.js";
 import Timesheet from "../models/Timesheet.js";
 import Freelancer from "../models/Freelancer.js";
+import { getFreelancerProfileByUserId } from "../utils/profileRefs.js";
 
 // F3.4 — Auto-generate invoice from approved timesheets
 export const generateInvoice = async (req, res) => {
@@ -30,7 +31,7 @@ export const generateInvoice = async (req, res) => {
     const amount = totalHours * (freelancerProfile.hourlyRate || 0);
 
     const invoice = await Invoice.create({
-      freelancer: freelancerId,
+      freelancer: freelancerProfile._id,
       project: projectId,
       totalHours,
       amount,
@@ -50,7 +51,11 @@ export const getInvoices = async (req, res) => {
     const filter = {};
 
     if (req.user.role === "FREELANCER") {
-      filter.freelancer = req.user.id;
+      const freelancerProfile = await getFreelancerProfileByUserId(req.user.id);
+      if (!freelancerProfile) {
+        return res.status(404).json({ message: "Freelancer profile not found" });
+      }
+      filter.freelancer = freelancerProfile._id;
     }
 
     const { status } = req.query;
@@ -58,7 +63,7 @@ export const getInvoices = async (req, res) => {
 
     const invoices = await Invoice
       .find(filter)
-      .populate("freelancer")
+      .populate({ path: "freelancer", populate: { path: "userId", select: "name email" } })
       .populate("project", "name")
       .sort({ createdAt: -1 });
 
@@ -72,7 +77,7 @@ export const getInvoiceById = async (req, res) => {
   try {
     const invoice = await Invoice
       .findById(req.params.id)
-      .populate("freelancer")
+      .populate({ path: "freelancer", populate: { path: "userId", select: "name email" } })
       .populate("project", "name");
 
     if (!invoice) {

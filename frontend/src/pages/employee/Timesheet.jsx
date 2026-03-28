@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import EmployeeLayout from "../../layouts/EmployeeLayout";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { attendanceApi } from "../../services/api";
 
 // ── Sample attendance data keyed by "YYYY-MM-DD" ──────────────────────────
 const attendanceData = {
@@ -44,8 +45,37 @@ export default function Timesheet() {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0-indexed
+  const [records, setRecords] = useState(attendanceData);
 
-  const cells = buildCalendar(viewYear, viewMonth);
+  useEffect(() => {
+    let active = true;
+
+    async function loadAttendance() {
+      try {
+        const data = await attendanceApi.getMyAttendance();
+        if (!active) return;
+        const rows = Array.isArray(data) ? data : data?.data || [];
+        if (!rows.length) return;
+
+        const mapped = rows.reduce((acc, row) => {
+          const key = new Date(row.date).toISOString().slice(0, 10);
+          const inTime = row.clockIn ? new Date(row.clockIn).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "-";
+          const outTime = row.clockOut ? new Date(row.clockOut).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "-";
+          acc[key] = { in: inTime, out: outTime, hours: row.hoursWorked || 0 };
+          return acc;
+        }, {});
+
+        setRecords(Object.keys(mapped).length ? mapped : attendanceData);
+      } catch {}
+    }
+
+    loadAttendance();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const cells = useMemo(() => buildCalendar(viewYear, viewMonth), [viewYear, viewMonth]);
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
@@ -119,7 +149,7 @@ export default function Timesheet() {
           {/* Calendar Grid */}
           <div className="grid grid-cols-7">
             {cells.map((day, idx) => {
-              const rec = day ? attendanceData[getKey(day)] : null;
+              const rec = day ? records[getKey(day)] : null;
               const today_ = day && isToday(day);
 
               return (

@@ -3,6 +3,7 @@ import Employee from "../models/Employee.js";
 import Attendance from "../models/Attendance.js";
 import Leave from "../models/Leave.js";
 import { generatePayslipPDF } from "../services/pdfService.js";
+import { getEmployeeProfileByUserId } from "../utils/profileRefs.js";
 
 // POST /api/payroll/generate  (ADMIN only)
 // Auto-calculates based on salary, attendance, and approved leaves
@@ -164,7 +165,14 @@ export const getAllPayroll = async (req, res) => {
 
     const payrolls = await Payroll
       .find(filter)
-      .populate("employee")
+      .populate({
+        path: "employee",
+        populate: [
+          { path: "userId", select: "name email" },
+          { path: "department", select: "name" },
+          { path: "designation", select: "title" }
+        ]
+      })
       .sort({ month: -1, createdAt: -1 });
 
     res.json(payrolls);
@@ -176,8 +184,13 @@ export const getAllPayroll = async (req, res) => {
 // GET /api/payroll/my  (EMPLOYEE — own payslips)
 export const getMyPayroll = async (req, res) => {
   try {
+    const employeeProfile = await getEmployeeProfileByUserId(req.user.id);
+    if (!employeeProfile) {
+      return res.status(404).json({ message: "Employee profile not found" });
+    }
+
     const payrolls = await Payroll
-      .find({ employee: req.user.id })
+      .find({ employee: employeeProfile._id })
       .sort({ month: -1 });
 
     res.json(payrolls);
@@ -199,10 +212,12 @@ export const getPayrollById = async (req, res) => {
 
     // Employees can only see their own payslip
     if (
-      req.user.role === "EMPLOYEE" &&
-      payroll.employee._id.toString() !== req.user.id
+      req.user.role === "EMPLOYEE"
     ) {
-      return res.status(403).json({ message: "Access denied" });
+      const employeeProfile = await getEmployeeProfileByUserId(req.user.id);
+      if (!employeeProfile || payroll.employee._id.toString() !== employeeProfile._id.toString()) {
+        return res.status(403).json({ message: "Access denied" });
+      }
     }
 
     res.json(payroll);
@@ -230,10 +245,12 @@ export const downloadPayslip = async (req, res) => {
     }
 
     if (
-      req.user.role === "EMPLOYEE" &&
-      payroll.employee._id.toString() !== req.user.id
+      req.user.role === "EMPLOYEE"
     ) {
-      return res.status(403).json({ message: "Access denied" });
+      const employeeProfile = await getEmployeeProfileByUserId(req.user.id);
+      if (!employeeProfile || payroll.employee._id.toString() !== employeeProfile._id.toString()) {
+        return res.status(403).json({ message: "Access denied" });
+      }
     }
 
     const pdfBuffer = await generatePayslipPDF(payroll, payroll.employee);

@@ -1,7 +1,13 @@
 import Leave from "../models/Leave.js";
+import { getEmployeeProfileByUserId } from "../utils/profileRefs.js";
 
 export const applyLeave = async (req, res) => {
   try {
+    const employeeProfile = await getEmployeeProfileByUserId(req.user.id);
+    if (!employeeProfile) {
+      return res.status(404).json({ message: "Employee profile not found" });
+    }
+
     const { type, from, to, reason } = req.body;
 
     if (!type || !from || !to) {
@@ -9,7 +15,7 @@ export const applyLeave = async (req, res) => {
     }
 
     const leave = await Leave.create({
-      employee: req.user.id,
+      employee: employeeProfile._id,
       type,
       from,
       to,
@@ -25,7 +31,12 @@ export const applyLeave = async (req, res) => {
 
 export const getMyLeaves = async (req, res) => {
   try {
-    const leaves = await Leave.find({ employee: req.user.id }).sort({ createdAt: -1 });
+    const employeeProfile = await getEmployeeProfileByUserId(req.user.id);
+    if (!employeeProfile) {
+      return res.status(404).json({ message: "Employee profile not found" });
+    }
+
+    const leaves = await Leave.find({ employee: employeeProfile._id }).sort({ createdAt: -1 });
     res.json(leaves);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -36,7 +47,13 @@ export const getAllLeaves = async (req, res) => {
   try {
     const { status } = req.query;
     const filter = status ? { status } : {};
-    const leaves = await Leave.find(filter).populate("employee").sort({ createdAt: -1 });
+    const leaves = await Leave.find(filter).populate({
+      path: "employee",
+      populate: [
+        { path: "userId", select: "name email" },
+        { path: "department", select: "name" },
+      ],
+    }).sort({ createdAt: -1 });
     res.json(leaves);
   } catch (error) {
     res.status(500).json({ message: error.message });

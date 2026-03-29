@@ -4,7 +4,7 @@ import Employee from "../models/Employee.js";
 // POST /api/departments
 export const createDepartment = async (req, res) => {
   try {
-    const { name, description, head } = req.body;
+    const { name, description, head, code, parentDepartment, location } = req.body;
 
     if (!name) {
       return res.status(400).json({ message: "Department name is required" });
@@ -15,7 +15,14 @@ export const createDepartment = async (req, res) => {
       return res.status(400).json({ message: "Department already exists" });
     }
 
-    const department = await Department.create({ name, description, head });
+    const department = await Department.create({
+      name,
+      description,
+      head,
+      code,
+      parentDepartment: parentDepartment || null,
+      location
+    });
     res.status(201).json({ message: "Department created", department });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -28,13 +35,27 @@ export const getDepartments = async (req, res) => {
     const departments = await Department
       .find()
       .populate("head", "name email")
+      .populate("parentDepartment", "name code")
       .sort({ name: 1 });
+
+    const childrenMap = departments.reduce((map, department) => {
+      const parentId = department.parentDepartment?._id
+        ? String(department.parentDepartment._id)
+        : null;
+      if (!parentId) return map;
+      map[parentId] = (map[parentId] || 0) + 1;
+      return map;
+    }, {});
 
     // Attach headcount to each department
     const enriched = await Promise.all(
       departments.map(async (dept) => {
         const headcount = await Employee.countDocuments({ department: dept._id });
-        return { ...dept.toObject(), headcount };
+        return {
+          ...dept.toObject(),
+          headcount,
+          divisionCount: childrenMap[String(dept._id)] || 0
+        };
       })
     );
 
@@ -49,7 +70,8 @@ export const getDepartmentById = async (req, res) => {
   try {
     const department = await Department
       .findById(req.params.id)
-      .populate("head", "name email");
+      .populate("head", "name email")
+      .populate("parentDepartment", "name code");
 
     if (!department) {
       return res.status(404).json({ message: "Department not found" });
@@ -59,9 +81,15 @@ export const getDepartmentById = async (req, res) => {
     const employees = await Employee
       .find({ department: req.params.id })
       .populate("userId", "name email")
-      .populate("designation");
+      .populate("designation")
+      .populate("manager", "name email");
 
-    res.json({ ...department.toObject(), employees });
+    const divisions = await Department
+      .find({ parentDepartment: req.params.id })
+      .populate("head", "name email")
+      .sort({ name: 1 });
+
+    res.json({ ...department.toObject(), employees, divisions });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

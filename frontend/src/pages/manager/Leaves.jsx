@@ -22,32 +22,67 @@ function normalizeLeave(leave) {
     startDate: leave.startDate || leave.from,
     endDate: leave.endDate || leave.to,
     type: leave.type || "Leave",
+    totalDays: leave.totalDays || leave.days || 1,
   };
 }
 
 export default function ManagerLeaves() {
   const [leaves, setLeaves] = useState(fallbackLeaves);
   const [error, setError] = useState("");
+  const [actionId, setActionId] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     let active = true;
 
-    async function loadLeaves() {
+    async function loadLeaves({ silent = false } = {}) {
+      if (!silent && active) setRefreshing(true);
       try {
         const data = await leaveApi.getAll();
         if (!active) return;
         const rows = Array.isArray(data) ? data : data?.data || fallbackLeaves;
         setLeaves(rows.map(normalizeLeave));
+        setError("");
       } catch (err) {
         if (active) setError(err.message || "Unable to load leave requests.");
+      } finally {
+        if (active && !silent) setRefreshing(false);
       }
     }
 
     loadLeaves();
+    const intervalId = setInterval(() => {
+      loadLeaves({ silent: true });
+    }, 15000);
+
     return () => {
       active = false;
+      clearInterval(intervalId);
     };
   }, []);
+
+  async function handleDecision(id, action) {
+    setActionId(id);
+    try {
+      if (action === "approve") {
+        await leaveApi.approve(id, "Approved by reporting manager");
+      } else {
+        await leaveApi.reject(id, "Rejected after policy review");
+      }
+
+      setLeaves((current) =>
+        current.map((leave) =>
+          leave._id === id
+            ? { ...leave, status: action === "approve" ? "APPROVED" : "REJECTED" }
+            : leave
+        )
+      );
+    } catch (err) {
+      setError(err.message || "Unable to update leave request.");
+    } finally {
+      setActionId("");
+    }
+  }
 
   return (
     <ManagerLayout>
@@ -55,6 +90,13 @@ export default function ManagerLeaves() {
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Leave Approvals</h1>
           <p className="mt-2 text-sm text-slate-500">Review upcoming absences and unblock the team quickly.</p>
+        </div>
+
+        <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm">
+          <p className="text-sm text-slate-500">New leave applications refresh automatically every 15 seconds.</p>
+          <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
+            {refreshing ? "Refreshing" : "Live Sync"}
+          </span>
         </div>
 
         {error ? (
@@ -67,7 +109,7 @@ export default function ManagerLeaves() {
           <table className="min-w-full">
             <thead className="bg-slate-50">
               <tr>
-                {["Employee", "Type", "Dates", "Status"].map((label) => (
+                {["Employee", "Type", "Dates", "Balance Impact", "Status", "Action"].map((label) => (
                   <th key={label} className="px-6 py-4 text-left text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
                     {label}
                   </th>
@@ -85,10 +127,37 @@ export default function ManagerLeaves() {
                     <td className="px-6 py-4 text-sm text-slate-600">
                       {formatDate(leave.startDate)} to {formatDate(leave.endDate)}
                     </td>
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      {leave.totalDays || leave.days || 1} day(s)
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${statusTone[status] || statusTone.PENDING}`}>
                         {status}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {status === "PENDING" ? (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={actionId === leave._id}
+                            onClick={() => handleDecision(leave._id, "approve")}
+                            className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-700 disabled:opacity-60"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            disabled={actionId === leave._id}
+                            onClick={() => handleDecision(leave._id, "reject")}
+                            className="rounded-full bg-rose-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-rose-700 disabled:opacity-60"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs font-semibold text-slate-400">Processed</span>
+                      )}
                     </td>
                   </tr>
                 );

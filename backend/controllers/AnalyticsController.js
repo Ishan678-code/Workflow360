@@ -7,6 +7,7 @@ import Employee from "../models/Employee.js";
 import Freelancer from "../models/Freelancer.js";
 import Invoice from "../models/Invoice.js";
 import User from "../models/User.js";
+import Department from "../models/Department.js";
 import { computePerformanceScore, computeTeamPerformance } from "../services/Performanceservice.js";
 import { generateAttendanceReportPDF, generatePerformanceReportPDF } from "../services/pdfService.js";
 import { getEmployeeProfileByUserId, getFreelancerProfileByUserId } from "../utils/profileRefs.js";
@@ -24,7 +25,8 @@ export const getDashboardStats = async (req, res) => {
         activeProjects,
         pendingLeaves,
         pendingTimesheets,
-        taskStats
+        taskStats,
+        totalDepartments
       ] = await Promise.all([
         Employee.countDocuments(),
         Freelancer.countDocuments(),
@@ -32,15 +34,34 @@ export const getDashboardStats = async (req, res) => {
         Project.countDocuments({ status: "ACTIVE" }),
         Leave.countDocuments({ status: "PENDING" }),
         Timesheet.countDocuments({ status: "PENDING" }),
-        Task.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }])
+        Task.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+        Department.countDocuments()
+      ]);
+
+      const projectTaskStats = await Task.aggregate([
+        {
+          $group: {
+            _id: "$project",
+            total: { $sum: 1 },
+            completed: {
+              $sum: { $cond: [{ $eq: ["$status", "COMPLETED"] }, 1, 0] }
+            }
+          }
+        }
       ]);
 
       const taskSummary = { TODO: 0, IN_PROGRESS: 0, COMPLETED: 0 };
       taskStats.forEach(t => { taskSummary[t._id] = t.count; });
+      const averageUtilization = projectTaskStats.length > 0
+        ? +(projectTaskStats.reduce((sum, item) => sum + (item.total > 0 ? (item.completed / item.total) * 100 : 0), 0) / projectTaskStats.length).toFixed(1)
+        : 0;
 
       return res.json({
         totalEmployees, totalFreelancers, totalProjects,
-        activeProjects, pendingLeaves, pendingTimesheets, taskSummary
+        activeProjects, pendingLeaves, pendingTimesheets, taskSummary,
+        totalDepartments,
+        averageUtilization,
+        utilizationFormula: "Average utilization = average of (completed tasks / total tasks) * 100 across projects"
       });
     }
 
@@ -140,7 +161,11 @@ export const getPerformanceReport = async (req, res) => {
 
     res.json({
       topEmployeesByCompletedTasks,
-      topFreelancersByHoursLogged
+      topFreelancersByHoursLogged,
+      algorithm: {
+        performanceScoreFormula: "0.40 * taskCompletionRatio + 0.35 * qualityScore + 0.25 * deadlineAdherence",
+        averageUtilizationFormula: "completed_tasks / total_tasks * 100"
+      }
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -246,6 +271,10 @@ export const getProductivityInsights = async (req, res) => {
         totalHoursLogged,
         avgHoursPerEntry,
         totalEntries: timesheets.length
+      },
+      algorithm: {
+        performanceScoreFormula: "0.40 * taskCompletionRatio + 0.35 * qualityScore + 0.25 * deadlineAdherence",
+        zScoreRule: "Absolute z-score above 2 flags an anomaly"
       }
     });
   } catch (error) {
@@ -311,14 +340,21 @@ export const getTeamPerformanceLeaderboard = async (req, res) => {
 
     // Run batch performance scoring with team context + Z-scores
     const leaderboard = computeTeamPerformance(usersMetrics);
+    const users = await User.find({ _id: { $in: leaderboard.map((entry) => entry.userId).filter(Boolean) } }).select("name email");
+    const userMap = new Map(users.map((user) => [String(user._id), user]));
+    const enrichedLeaderboard = leaderboard.map((entry) => ({
+      ...entry,
+      name: userMap.get(String(entry.userId))?.name || "Unknown User",
+      email: userMap.get(String(entry.userId))?.email || ""
+    }));
 
     res.json({
       period      : `${periodDays} days`,
-      totalUsers  : leaderboard.length,
-      leaderboard,
+      totalUsers  : enrichedLeaderboard.length,
+      leaderboard: enrichedLeaderboard,
       anomalies: {
-        exceptional     : leaderboard.filter(u => u.anomaly.flag === "EXCEPTIONAL").length,
-        underperforming : leaderboard.filter(u => u.anomaly.flag === "UNDERPERFORMING").length
+        exceptional     : enrichedLeaderboard.filter(u => u.anomaly.flag === "EXCEPTIONAL").length,
+        underperforming : enrichedLeaderboard.filter(u => u.anomaly.flag === "UNDERPERFORMING").length
       }
     });
   } catch (error) {

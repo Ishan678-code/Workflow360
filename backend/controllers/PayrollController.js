@@ -5,6 +5,76 @@ import Leave from "../models/Leave.js";
 import { generatePayslipPDF } from "../services/pdfService.js";
 import { getEmployeeProfileByUserId } from "../utils/profileRefs.js";
 
+function getMonthRange(month) {
+  const [year, mon] = month.split("-").map(Number);
+  const from = new Date(year, mon - 1, 1);
+  const to = new Date(year, mon, 0, 23, 59, 59);
+  return { from, to, totalDaysInMonth: to.getDate() };
+}
+
+function countLeaveDays(leaves, from, to) {
+  return leaves.reduce((sum, leave) => {
+    const leaveFrom = new Date(Math.max(new Date(leave.from), from));
+    const leaveTo = new Date(Math.min(new Date(leave.to), to));
+    const days = Math.ceil((leaveTo - leaveFrom) / 86400000) + 1;
+    return sum + Math.max(days, 0);
+  }, 0);
+}
+
+function buildPayrollNumber(employee, month) {
+  return `PAY-${month.replace("-", "")}-${employee.employeeCode || employee._id.toString().slice(-6).toUpperCase()}`;
+}
+
+function calculatePayrollForEmployee(employee, attendanceRecords, approvedLeaves, month, generatedBy = null) {
+  const { from, to, totalDaysInMonth } = getMonthRange(month);
+  const daysAttended = attendanceRecords.length;
+  const leaveDays = countLeaveDays(approvedLeaves, from, to);
+  const lateDays = attendanceRecords.filter((record) => (record.lateMinutes || 0) > 0).length;
+  const totalLateMinutes = attendanceRecords.reduce((sum, record) => sum + (record.lateMinutes || 0), 0);
+  const overtimeHours = +attendanceRecords.reduce((sum, record) => sum + (record.overtimeHours || 0), 0).toFixed(2);
+
+  const grossSalary = employee.salary || 0;
+  const perDayRate = totalDaysInMonth > 0 ? grossSalary / totalDaysInMonth : 0;
+  const paidDays = daysAttended + leaveDays;
+  const lopDays = Math.max(totalDaysInMonth - paidDays, 0);
+  const lopDeduction = +(perDayRate * lopDays).toFixed(2);
+  const taxDeduction = +(grossSalary * 0.10).toFixed(2);
+  const deductions = +(lopDeduction + taxDeduction).toFixed(2);
+  const netSalary = +(grossSalary - deductions).toFixed(2);
+
+  return {
+    employee: employee._id,
+    month,
+    payrollNumber: buildPayrollNumber(employee, month),
+    status: "GENERATED",
+    grossSalary,
+    deductions,
+    netSalary,
+    generatedBy,
+    breakdown: {
+      totalDaysInMonth,
+      daysAttended,
+      leaveDays,
+      lopDays,
+      lopDeduction,
+      taxDeduction,
+      lateDays,
+      lateMinutes: totalLateMinutes,
+      overtimeHours
+    }
+  };
+}
+
+function serializePayrollRecord(payrollDoc) {
+  const payroll = payrollDoc.toObject ? payrollDoc.toObject() : payrollDoc;
+  return {
+    ...payroll,
+    employeeName: payroll.employee?.userId?.name || payroll.employee?.name || "Team Member",
+    departmentName: payroll.employee?.department?.name || "Unassigned",
+    designationTitle: payroll.employee?.designation?.title || payroll.employee?.designation || "Role pending"
+  };
+}
+
 // POST /api/payroll/generate  (ADMIN only)
 // Auto-calculates based on salary, attendance, and approved leaves
 export const generatePayroll = async (req, res) => {
@@ -26,61 +96,25 @@ export const generatePayroll = async (req, res) => {
       return res.status(404).json({ message: "Employee not found" });
     }
 
-    // Parse month range
-    const [year, mon]  = month.split("-").map(Number);
-    const from         = new Date(year, mon - 1, 1);
-    const to           = new Date(year, mon, 0, 23, 59, 59);
-    const totalDaysInMonth = to.getDate();
+    const { from, to } = getMonthRange(month);
 
-    // Count working days attended
-    const attendanceRecords = await Attendance.find({
-      employee : employeeId,
-      date     : { $gte: from, $lte: to },
-      clockIn  : { $exists: true }
-    });
-    const daysAttended = attendanceRecords.length;
+    const [attendanceRecords, leaves] = await Promise.all([
+      Attendance.find({
+        employee: employeeId,
+        date: { $gte: from, $lte: to },
+        clockIn: { $exists: true }
+      }),
+      Leave.find({
+        employee: employeeId,
+        status: "APPROVED",
+        from: { $lte: to },
+        to: { $gte: from }
+      })
+    ]);
 
-    // Count approved leave days in the month
-    const leaves = await Leave.find({
-      employee : employeeId,
-      status   : "APPROVED",
-      from     : { $lte: to },
-      to       : { $gte: from }
-    });
-    const leaveDays = leaves.reduce((sum, l) => {
-      const leaveFrom = new Date(Math.max(l.from, from));
-      const leaveTo   = new Date(Math.min(l.to, to));
-      const days = Math.ceil((leaveTo - leaveFrom) / (1000 * 60 * 60 * 24)) + 1;
-      return sum + Math.max(days, 0);
-    }, 0);
-
-    // ── Payroll calculation ────────────────────────────────────────────────
-    const grossSalary   = employee.salary || 0;
-    const perDayRate    = grossSalary / totalDaysInMonth;
-    const paidDays      = daysAttended + leaveDays;
-    const lopDays       = Math.max(totalDaysInMonth - paidDays, 0);   // Loss of Pay
-    const lopDeduction  = +(perDayRate * lopDays).toFixed(2);
-
-    // Tax deduction: flat 10% (can be made configurable)
-    const taxDeduction  = +(grossSalary * 0.10).toFixed(2);
-    const totalDeductions = +(lopDeduction + taxDeduction).toFixed(2);
-    const netSalary       = +(grossSalary - totalDeductions).toFixed(2);
-
-    const payroll = await Payroll.create({
-      employee    : employeeId,
-      month,
-      grossSalary,
-      deductions  : totalDeductions,
-      netSalary,
-      breakdown: {
-        totalDaysInMonth,
-        daysAttended,
-        leaveDays,
-        lopDays,
-        lopDeduction,
-        taxDeduction
-      }
-    });
+    const payroll = await Payroll.create(
+      calculatePayrollForEmployee(employee, attendanceRecords, leaves, month, req.user.id)
+    );
 
     res.status(201).json({ message: "Payroll generated", payroll });
   } catch (error) {
@@ -106,38 +140,17 @@ export const generateBulkPayroll = async (req, res) => {
         const existing = await Payroll.findOne({ employee: emp._id, month });
         if (existing) return { employeeId: emp._id, status: "skipped", reason: "already exists" };
 
-        const [year, mon]       = month.split("-").map(Number);
-        const from              = new Date(year, mon - 1, 1);
-        const to                = new Date(year, mon, 0, 23, 59, 59);
-        const totalDaysInMonth  = to.getDate();
+        const { from, to } = getMonthRange(month);
 
         const [attendanceRecords, leaves] = await Promise.all([
           Attendance.find({ employee: emp._id, date: { $gte: from, $lte: to }, clockIn: { $exists: true } }),
           Leave.find({ employee: emp._id, status: "APPROVED", from: { $lte: to }, to: { $gte: from } })
         ]);
 
-        const daysAttended  = attendanceRecords.length;
-        const leaveDays     = leaves.reduce((sum, l) => {
-          const lf   = new Date(Math.max(l.from, from));
-          const lt   = new Date(Math.min(l.to, to));
-          return sum + Math.max(Math.ceil((lt - lf) / 86400000) + 1, 0);
-        }, 0);
+        const payrollPayload = calculatePayrollForEmployee(emp, attendanceRecords, leaves, month, req.user.id);
+        await Payroll.create(payrollPayload);
 
-        const grossSalary     = emp.salary || 0;
-        const perDayRate      = grossSalary / totalDaysInMonth;
-        const lopDays         = Math.max(totalDaysInMonth - daysAttended - leaveDays, 0);
-        const lopDeduction    = +(perDayRate * lopDays).toFixed(2);
-        const taxDeduction    = +(grossSalary * 0.10).toFixed(2);
-        const totalDeductions = +(lopDeduction + taxDeduction).toFixed(2);
-        const netSalary       = +(grossSalary - totalDeductions).toFixed(2);
-
-        await Payroll.create({
-          employee: emp._id, month, grossSalary,
-          deductions: totalDeductions, netSalary,
-          breakdown: { totalDaysInMonth, daysAttended, leaveDays, lopDays, lopDeduction, taxDeduction }
-        });
-
-        return { employeeId: emp._id, status: "generated", netSalary };
+        return { employeeId: emp._id, status: "generated", netSalary: payrollPayload.netSalary };
       })
     );
 
@@ -175,7 +188,7 @@ export const getAllPayroll = async (req, res) => {
       })
       .sort({ month: -1, createdAt: -1 });
 
-    res.json(payrolls);
+    res.json(payrolls.map(serializePayrollRecord));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -191,9 +204,17 @@ export const getMyPayroll = async (req, res) => {
 
     const payrolls = await Payroll
       .find({ employee: employeeProfile._id })
+      .populate({
+        path: "employee",
+        populate: [
+          { path: "userId", select: "name email" },
+          { path: "department", select: "name" },
+          { path: "designation", select: "title" }
+        ]
+      })
       .sort({ month: -1 });
 
-    res.json(payrolls);
+    res.json(payrolls.map(serializePayrollRecord));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -204,7 +225,14 @@ export const getPayrollById = async (req, res) => {
   try {
     const payroll = await Payroll
       .findById(req.params.id)
-      .populate("employee");
+      .populate({
+        path: "employee",
+        populate: [
+          { path: "userId", select: "name email" },
+          { path: "department", select: "name" },
+          { path: "designation", select: "title" }
+        ]
+      });
 
     if (!payroll) {
       return res.status(404).json({ message: "Payroll record not found" });
@@ -220,7 +248,7 @@ export const getPayrollById = async (req, res) => {
       }
     }
 
-    res.json(payroll);
+    res.json(serializePayrollRecord(payroll));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

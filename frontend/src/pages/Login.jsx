@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../services/api";
 
@@ -75,6 +75,14 @@ const roleRoutes = {
 
 export default function Login() {
   const navigate = useNavigate();
+  const existingToken = localStorage.getItem("token");
+  const existingUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  })();
 
   const [email, setEmail]           = useState("");
   const [password, setPassword]     = useState("");
@@ -83,6 +91,12 @@ export default function Login() {
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState("");
   const [selectedRole, setSelectedRole] = useState("EMPLOYEE");
+
+  useEffect(() => {
+    if (existingToken && existingUser?.role) {
+      navigate(roleRoutes[existingUser.role] ?? "/", { replace: true });
+    }
+  }, [existingToken, existingUser?.role, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

@@ -55,8 +55,10 @@ export const authApi = {
 
 // ── Attendance ────────────────────────────────────────────────────────────────
 export const attendanceApi = {
-  clockIn: () => request("/attendance/clock-in", { method: "POST" }),
-  clockOut: () => request("/attendance/clock-out", { method: "PUT" }),
+  clockIn: (terminalId = "WEB") =>
+    request("/attendance/clock-in", { method: "POST", body: JSON.stringify({ terminalId }) }),
+  clockOut: (terminalId = "WEB") =>
+    request("/attendance/clock-out", { method: "PUT", body: JSON.stringify({ terminalId }) }),
   getMyAttendance: (from, to) => {
     const params = new URLSearchParams();
     if (from) params.append("from", from);
@@ -203,8 +205,11 @@ export const performanceApi = {
 // ── Departments ───────────────────────────────────────────────────────────────
 export const departmentApi = {
   getAll: () => request("/departments"),
+  getById: (id) => request(`/departments/${id}`),
   create: (payload) =>
     request("/departments", { method: "POST", body: JSON.stringify(payload) }),
+  update: (id, payload) =>
+    request(`/departments/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
 };
 
 // ── Roles ─────────────────────────────────────────────────────────────────────

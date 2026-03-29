@@ -13,6 +13,8 @@ function normalizePayroll(record) {
   return {
     ...record,
     employeeName: record.employeeName || record.employee?.userId?.name || record.employee?.name || "Team Member",
+    departmentName: record.departmentName || record.employee?.department?.name || "Unassigned",
+    designationTitle: record.designationTitle || record.employee?.designation?.title || "Role pending",
     status: record.status || "PROCESSED",
   };
 }
@@ -59,7 +61,7 @@ export default function ManagerPayroll() {
           <table className="min-w-full">
             <thead className="bg-slate-50">
               <tr>
-                {["Employee", "Month", "Net Pay", "Status"].map((label) => (
+                {["Employee", "Department", "Role", "Month", "Net Pay", "Status"].map((label) => (
                   <th key={label} className="px-6 py-4 text-left text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
                     {label}
                   </th>
@@ -69,7 +71,12 @@ export default function ManagerPayroll() {
             <tbody className="divide-y divide-slate-100">
               {records.map((record) => (
                 <tr key={record._id || `${record.employeeName}-${record.month}`} className="hover:bg-slate-50/70">
-                  <td className="px-6 py-4 text-sm font-semibold text-slate-800">{record.employeeName || record.employee?.name || "Team Member"}</td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-semibold text-slate-800">{record.employeeName || record.employee?.name || "Team Member"}</div>
+                    <div className="mt-1 text-xs text-slate-400">{record.payrollNumber || "Payroll record"}</div>
+                  </td>
+                  <td className="px-6 py-4 text-sm font-medium text-slate-700">{record.departmentName || "Unassigned"}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-slate-700">{record.designationTitle || "Role pending"}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{formatMonthLabel(record.month || record.payPeriod || "2026-03")}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{formatCurrency(record.netSalary || record.amount || 0)}</td>
                   <td className="px-6 py-4 text-sm font-semibold text-violet-700">{record.status || "PENDING"}</td>

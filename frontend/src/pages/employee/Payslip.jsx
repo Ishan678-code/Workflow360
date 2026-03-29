@@ -61,6 +61,8 @@ export default function ViewPayslip() {
           deduct: formatCurrency(item.deductions || 0),
           net: formatCurrency(item.netSalary || 0),
           status: item.month === rows[0]?.month ? "Processing" : "Paid",
+          departmentName: item.employee?.department?.name || "Unassigned",
+          designationTitle: item.employee?.designation?.title || "Role pending",
         })));
       } catch {}
     }
@@ -110,6 +112,17 @@ export default function ViewPayslip() {
           />
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Department</p>
+            <p className="mt-2 text-xl font-black text-slate-800">{latest.departmentName || "Unassigned"}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Role</p>
+            <p className="mt-2 text-xl font-black text-slate-800">{latest.designationTitle || "Role pending"}</p>
+          </div>
+        </div>
+
         {/* Payslip History Table */}
         <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
           <div className="p-6 border-b border-slate-50 flex justify-between items-center">
@@ -124,6 +137,8 @@ export default function ViewPayslip() {
               <thead>
                 <tr className="bg-slate-50/50">
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Period</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Department</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Role</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Gross Pay</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Deductions</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Net Pay</th>
@@ -137,6 +152,8 @@ export default function ViewPayslip() {
                     <td className="px-6 py-5">
                       <span className="text-[13px] font-bold text-slate-700">{item.period}</span>
                     </td>
+                    <td className="px-6 py-5 text-[13px] font-medium text-slate-600">{item.departmentName || "Unassigned"}</td>
+                    <td className="px-6 py-5 text-[13px] font-medium text-slate-600">{item.designationTitle || "Role pending"}</td>
                     <td className="px-6 py-5 text-[13px] font-medium text-slate-600">{item.gross}</td>
                     <td className="px-6 py-5 text-[13px] font-medium text-rose-500">{item.deduct}</td>
                     <td className="px-6 py-5 text-[13px] font-black text-slate-800">{item.net}</td>

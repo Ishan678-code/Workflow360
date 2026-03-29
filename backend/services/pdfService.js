@@ -101,6 +101,7 @@ export async function generatePayslipPDF(payroll, employee) {
   row(doc, "Department",     dept,     y);       y += 20;
   row(doc, "Designation",    desig,    y);       y += 20;
   row(doc, "Pay Month",      payroll.month, y);  y += 20;
+  row(doc, "Payroll Number", payroll.payrollNumber || "N/A", y); y += 20;
 
   doc.y = y + 10;
 
@@ -129,6 +130,9 @@ export async function generatePayslipPDF(payroll, employee) {
   row(doc, "Days Attended",       bd.daysAttended     ?? "—", y); y += 20;
   row(doc, "Leave Days (Paid)",   bd.leaveDays        ?? "—", y); y += 20;
   row(doc, "Loss of Pay Days",    bd.lopDays          ?? "—", y); y += 20;
+  row(doc, "Late Arrivals",       bd.lateDays         ?? "—", y); y += 20;
+  row(doc, "Late Minutes",        bd.lateMinutes      ?? "—", y); y += 20;
+  row(doc, "Overtime Hours",      bd.overtimeHours    ?? "—", y); y += 20;
   doc.y = y + 6;
 
   // ── Net salary ─────────────────────────────────────────────────────────────

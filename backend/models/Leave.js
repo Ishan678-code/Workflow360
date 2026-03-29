@@ -5,6 +5,7 @@ const leaveSchema = new mongoose.Schema({
   type: { type: String, enum: ["SICK", "CASUAL", "VACATION"] },
   from: Date,
   to: Date,
+  totalDays: Number,
   reason: String,
   status: {
     type: String,
@@ -12,7 +13,8 @@ const leaveSchema = new mongoose.Schema({
     default: "PENDING"
   },
   approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  comment: String
+  comment: String,
+  approvalDepartment: { type: mongoose.Schema.Types.ObjectId, ref: "Department" }
 }, { timestamps: true });
 
 export default mongoose.model("Leave", leaveSchema);

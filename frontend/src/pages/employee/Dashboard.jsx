@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import EmployeeLayout from "../../layouts/EmployeeLayout";
-import { analyticsApi } from "../../services/api";
+import { analyticsApi, attendanceApi } from "../../services/api";
 import {
   Clock,
   Settings,
@@ -36,14 +36,18 @@ const StatCard = ({ label, value, sub, icon: Icon, color }) => (
 export default function EmployeeDashboard() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const [clockedIn, setClockedIn] = useState(false);
+  const [shiftDone, setShiftDone] = useState(false);
   const [clockInTime, setClockInTime] = useState(null);
+  const [clockOutTime, setClockOutTime] = useState(null);
   const [hoursToday, setHoursToday] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [clockError, setClockError] = useState("");
   const [liveTime, setLiveTime] = useState(new Date());
   const [dashboardStats, setDashboardStats] = useState(null);
   const [productivity, setProductivity] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState("");
+  const [attendanceInfo, setAttendanceInfo] = useState(null);
 
   useEffect(() => {
     const t = setInterval(() => setLiveTime(new Date()), 1000);
@@ -58,6 +62,39 @@ export default function EmployeeDashboard() {
     }, 5000);
     return () => clearInterval(t);
   }, [clockedIn, clockInTime]);
+
+  // Restore clock-in state from today's attendance record on mount
+  useEffect(() => {
+    let active = true;
+    async function checkTodayAttendance() {
+      try {
+        // Fetch all records (sorted desc) and check if the latest is from today
+        const records = await attendanceApi.getMyAttendance();
+        if (!active) return;
+        if (records?.length > 0) {
+          const record = records[0];
+          const recordDate = new Date(record.date || record.clockIn);
+          const isToday = recordDate.toDateString() === new Date().toDateString();
+          if (!isToday) return;
+          if (record.clockIn && !record.clockOut) {
+            setClockedIn(true);
+            setClockInTime(new Date(record.clockIn).getTime());
+            setAttendanceInfo({ attendance: record, alignment: record.alignment });
+          } else if (record.clockIn && record.clockOut) {
+            setShiftDone(true);
+            setClockInTime(new Date(record.clockIn).getTime());
+            setClockOutTime(new Date(record.clockOut).getTime());
+            setHoursToday(record.hoursWorked ?? 0);
+            setAttendanceInfo({ attendance: record, alignment: record.alignment });
+          }
+        }
+      } catch {
+        // no-op — if this fails, state stays at defaults
+      }
+    }
+    checkTodayAttendance();
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -107,19 +144,67 @@ export default function EmployeeDashboard() {
 
   const handleClockIn = async () => {
     setLoading(true);
-    setTimeout(() => {
+    setClockError("");
+    try {
+      const response = await attendanceApi.clockIn("WEB-DASHBOARD");
+      const startedAt = response?.attendance?.clockIn ? new Date(response.attendance.clockIn).getTime() : Date.now();
       setClockedIn(true);
-      setClockInTime(Date.now());
+      setClockInTime(startedAt);
+      setAttendanceInfo(response);
+    } catch (error) {
+      if (error.message === "Already clocked in today") {
+        // State wasn't restored on mount — fetch the existing record and sync UI
+        try {
+          const records = await attendanceApi.getMyAttendance();
+          if (records?.length > 0) {
+            const record = records[0];
+            setClockedIn(true);
+            setClockInTime(new Date(record.clockIn).getTime());
+            setAttendanceInfo({ attendance: record, alignment: record.alignment });
+          }
+        } catch {
+          setClockError("Already clocked in today.");
+        }
+      } else {
+        setClockError(error.message || "Unable to clock in right now.");
+      }
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   const handleClockOut = async () => {
     setLoading(true);
-    setTimeout(() => {
+    setClockError("");
+    try {
+      const response = await attendanceApi.clockOut("WEB-DASHBOARD");
       setClockedIn(false);
+      setShiftDone(true);
+      setClockOutTime(Date.now());
+      setHoursToday(response?.hoursWorked ?? hoursToday);
+      setAttendanceInfo(response);
+    } catch (error) {
+      if (error.message === "Already clocked out today") {
+        // Sync state from the existing completed record
+        try {
+          const records = await attendanceApi.getMyAttendance();
+          if (records?.length > 0) {
+            const record = records[0];
+            setClockedIn(false);
+            setShiftDone(true);
+            setClockOutTime(new Date(record.clockOut).getTime());
+            setHoursToday(record.hoursWorked ?? 0);
+            setAttendanceInfo({ attendance: record, alignment: record.alignment });
+          }
+        } catch {
+          setClockError("Already clocked out today.");
+        }
+      } else {
+        setClockError(error.message || "Unable to clock out right now.");
+      }
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   const formatTime = (d) =>
@@ -148,6 +233,11 @@ export default function EmployeeDashboard() {
   const avgQuality = productivity?.rawMetrics?.avgQuality != null
     ? `${Number(productivity.rawMetrics.avgQuality).toFixed(1)}/5`
     : "0.0/5";
+  const officeStart = attendanceInfo?.alignment?.officeStart || "09:00";
+  const officeEnd = attendanceInfo?.alignment?.officeEnd || "17:00";
+  const lateMinutes = attendanceInfo?.alignment?.lateMinutes ?? attendanceInfo?.attendance?.lateMinutes ?? 0;
+  const earlyExitMinutes = attendanceInfo?.alignment?.earlyExitMinutes ?? 0;
+  const overtimeHours = attendanceInfo?.alignment?.overtimeHours ?? attendanceInfo?.attendance?.overtimeHours ?? 0;
 
   return (
     <EmployeeLayout>
@@ -209,9 +299,9 @@ export default function EmployeeDashboard() {
               </div>
               <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 p-4">
                 <span className="text-[10px] font-bold uppercase text-slate-400">Status</span>
-                <span className="text-xs font-black text-slate-700">{anomalyFlag}</span>
+                  <span className="text-xs font-black text-slate-700">{anomalyFlag}</span>
+                </div>
               </div>
-            </div>
 
             <button className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-4 text-xs font-bold text-white shadow-lg shadow-slate-200 transition-all hover:bg-blue-600">
               <Settings size={14} /> Manage Account
@@ -228,11 +318,16 @@ export default function EmployeeDashboard() {
                   <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-blue-400">
                     Shift Control Center
                   </span>
-                  {clockedIn ? (
+                  {clockedIn && (
                     <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-400">
                       <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" /> Live
                     </span>
-                  ) : null}
+                  )}
+                  {shiftDone && (
+                    <span className="flex items-center gap-1.5 rounded-full border border-slate-500/20 bg-slate-500/10 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                      <CheckCircle2 size={10} className="text-slate-400" /> Shift Complete
+                    </span>
+                  )}
                 </div>
                 <h3 className="text-6xl font-black tracking-tighter text-white">
                   {formatTime(liveTime).split(" ")[0]}
@@ -249,24 +344,37 @@ export default function EmployeeDashboard() {
             </div>
 
             <div className="relative z-10 mt-10 flex flex-col items-center gap-8 lg:flex-row">
-              <button
-                onClick={clockedIn ? handleClockOut : handleClockIn}
-                disabled={loading}
-                className={`flex w-full items-center justify-center gap-3 rounded-2xl px-12 py-5 text-xs font-black tracking-widest text-white shadow-xl transition-all active:scale-95 disabled:opacity-50 lg:w-auto ${
-                  clockedIn
-                    ? "bg-gradient-to-r from-rose-500 to-red-600 shadow-red-900/20"
-                    : "bg-gradient-to-r from-blue-500 to-indigo-600 shadow-blue-900/20"
-                }`}
-              >
-                {loading ? (
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                ) : clockedIn ? (
-                  <Clock size={18} />
-                ) : (
-                  <Zap size={18} fill="currentColor" />
-                )}
-                {clockedIn ? "END CURRENT SHIFT" : "INITIALIZE CLOCK IN"}
-              </button>
+              {shiftDone ? (
+                <div className="flex w-full items-center gap-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-8 py-5 lg:w-auto">
+                  <CheckCircle2 size={22} className="text-emerald-400 shrink-0" />
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Shift Completed</p>
+                    <p className="mt-0.5 text-sm font-bold text-white">
+                      {clockInTime ? formatTime(new Date(clockInTime)) : "--"} → {clockOutTime ? formatTime(new Date(clockOutTime)) : "--"}
+                      <span className="ml-2 text-emerald-400">· {hoursToday} hrs</span>
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={clockedIn ? handleClockOut : handleClockIn}
+                  disabled={loading}
+                  className={`flex w-full items-center justify-center gap-3 rounded-2xl px-12 py-5 text-xs font-black tracking-widest text-white shadow-xl transition-all active:scale-95 disabled:opacity-50 lg:w-auto ${
+                    clockedIn
+                      ? "bg-gradient-to-r from-rose-500 to-red-600 shadow-red-900/20"
+                      : "bg-gradient-to-r from-blue-500 to-indigo-600 shadow-blue-900/20"
+                  }`}
+                >
+                  {loading ? (
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  ) : clockedIn ? (
+                    <Clock size={18} />
+                  ) : (
+                    <Zap size={18} fill="currentColor" />
+                  )}
+                  {clockedIn ? "END CURRENT SHIFT" : "INITIALIZE CLOCK IN"}
+                </button>
+              )}
 
               <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-md">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-slate-400">
@@ -275,11 +383,21 @@ export default function EmployeeDashboard() {
                 <div className="flex flex-col">
                   <span className="mb-1 text-[9px] font-black uppercase tracking-widest leading-none text-slate-500">Entry Log</span>
                   <span className="text-[13px] font-bold text-white">
-                    {clockedIn ? `Started at ${formatTime(new Date(clockInTime))}` : "System Ready for Log-in"}
+                    {shiftDone
+                      ? `Clocked out at ${clockOutTime ? formatTime(new Date(clockOutTime)) : "--"}`
+                      : clockedIn
+                      ? `Started at ${formatTime(new Date(clockInTime))}`
+                      : "System Ready for Log-in"}
                   </span>
                 </div>
               </div>
             </div>
+
+            {clockError && (
+              <div className="relative z-10 mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-300">
+                {clockError}
+              </div>
+            )}
           </div>
         </div>
 
@@ -307,6 +425,76 @@ export default function EmployeeDashboard() {
               {analyticsError}
             </div>
           ) : null}
+        </section>
+
+        <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <article className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm xl:col-span-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Attendance Alignment</p>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Office-hour tracking and terminal alignment</h2>
+              </div>
+              <span className="rounded-full bg-slate-100 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-700">
+                {officeStart} - {officeEnd}
+              </span>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Late Arrival</p>
+                <p className="mt-2 text-3xl font-black text-slate-900">{lateMinutes} min</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Early Exit</p>
+                <p className="mt-2 text-3xl font-black text-slate-900">{earlyExitMinutes} min</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Overtime</p>
+                <p className="mt-2 text-3xl font-black text-slate-900">{Number(overtimeHours).toFixed(2)} hrs</p>
+              </div>
+            </div>
+
+            <p className="mt-4 text-sm text-slate-500">
+              Clock-in and clock-out are aligned against your assigned office window. Terminal source is recorded as <span className="font-semibold text-slate-700">{attendanceInfo?.attendance?.terminalId || "WEB-DASHBOARD"}</span>.
+            </p>
+          </article>
+
+          <article className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Performance Formula</p>
+            <h2 className="mt-2 text-xl font-black tracking-tight text-slate-900">Algorithm breakdown</h2>
+            <div className="mt-5 space-y-4">
+              <div>
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="font-semibold text-slate-700">Task completion</span>
+                  <span className="text-slate-500">40%</span>
+                </div>
+                <div className="h-2 rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-emerald-500" style={{ width: "40%" }} />
+                </div>
+              </div>
+              <div>
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="font-semibold text-slate-700">Quality of work</span>
+                  <span className="text-slate-500">35%</span>
+                </div>
+                <div className="h-2 rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-blue-500" style={{ width: "35%" }} />
+                </div>
+              </div>
+              <div>
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="font-semibold text-slate-700">Deadline adherence</span>
+                  <span className="text-slate-500">25%</span>
+                </div>
+                <div className="h-2 rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-violet-500" style={{ width: "25%" }} />
+                </div>
+              </div>
+            </div>
+            <p className="mt-4 text-sm text-slate-500">
+              Performance score = 0.40 × task completion + 0.35 × quality + 0.25 × deadline adherence.
+            </p>
+          </article>
         </section>
 
         <div className="grid grid-cols-1 gap-6 pt-4 md:grid-cols-3">

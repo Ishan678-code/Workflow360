@@ -3,15 +3,40 @@ import User from "../models/User.js";
 
 export const createEmployee = async (req, res) => {
   try {
-    const { userId, employeeCode, department, designation, salary, joiningDate, phone, emergencyContact } = req.body;
+    const {
+      userId,
+      employeeCode,
+      department,
+      designation,
+      manager,
+      salary,
+      joiningDate,
+      phone,
+      emergencyContact,
+      employmentType,
+      workMode,
+      officeHours,
+      leaveBalance
+    } = req.body;
 
     if (!userId || !employeeCode) {
       return res.status(400).json({ message: "userId and employeeCode are required" });
     }
 
     const employee = await Employee.create({
-      userId, employeeCode, department, designation,
-      salary, joiningDate, phone, emergencyContact
+      userId,
+      employeeCode,
+      department,
+      designation,
+      manager,
+      salary,
+      joiningDate,
+      phone,
+      emergencyContact,
+      employmentType,
+      workMode,
+      officeHours,
+      leaveBalance
     });
 
     res.status(201).json({ message: "Employee created", employee });
@@ -26,7 +51,8 @@ export const getEmployees = async (req, res) => {
       .find()
       .populate("userId", "-password")
       .populate("department")
-      .populate("designation");
+      .populate("designation")
+      .populate("manager", "name email");
     res.json(employees);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -39,7 +65,8 @@ export const getEmployeeById = async (req, res) => {
       .findById(req.params.id)
       .populate("userId", "-password")
       .populate("department")
-      .populate("designation");
+      .populate("designation")
+      .populate("manager", "name email");
 
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
@@ -57,7 +84,11 @@ export const updateEmployee = async (req, res) => {
       req.params.id,
       req.body,
       { new: true, runValidators: true }
-    );
+    )
+      .populate("userId", "-password")
+      .populate("department")
+      .populate("designation")
+      .populate("manager", "name email");
 
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });

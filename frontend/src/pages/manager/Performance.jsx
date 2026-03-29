@@ -16,6 +16,8 @@ const fallbackReviews = [
 export default function ManagerPerformance() {
   const [cards, setCards] = useState(fallbackCards);
   const [reviews, setReviews] = useState(fallbackReviews);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [algorithm, setAlgorithm] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -23,9 +25,10 @@ export default function ManagerPerformance() {
 
     async function loadPerformance() {
       try {
-        const [analytics, reviewData] = await Promise.allSettled([
+        const [analytics, reviewData, teamData] = await Promise.allSettled([
           analyticsApi.getPerformance(),
           performanceApi.getAll(),
+          analyticsApi.getTeamPerformance(30),
         ]);
 
         if (!active) return;
@@ -44,7 +47,15 @@ export default function ManagerPerformance() {
           if (Array.isArray(resolved) && resolved.length) setReviews(resolved);
         }
 
-        if (analytics.status === "rejected" && reviewData.status === "rejected") {
+        if (teamData.status === "fulfilled") {
+          setLeaderboard(teamData.value?.leaderboard || []);
+        }
+
+        if (analytics.status === "fulfilled" && analytics.value?.algorithm) {
+          setAlgorithm(analytics.value.algorithm);
+        }
+
+        if (analytics.status === "rejected" && reviewData.status === "rejected" && teamData.status === "rejected") {
           setError("Live performance data is unavailable.");
         }
       } catch (err) {
@@ -80,6 +91,59 @@ export default function ManagerPerformance() {
             </article>
           ))}
         </div>
+
+        <section className="grid gap-6 xl:grid-cols-[1.2fr,0.8fr]">
+          <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-black text-slate-900">30-Day Performance Leaderboard</h2>
+            <div className="mt-5 space-y-4">
+              {leaderboard.length ? leaderboard.slice(0, 5).map((entry, index) => (
+                <article key={entry.userId || index} className="rounded-2xl bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Rank #{index + 1}</p>
+                      <h3 className="mt-1 text-base font-black text-slate-900">{entry.name || "Team Member"}</h3>
+                    </div>
+                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-blue-700">
+                      Score {Number(entry.score || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="mt-4 h-2 rounded-full bg-white">
+                    <div className="h-full rounded-full bg-slate-900" style={{ width: `${Math.min((entry.score || 0) * 100, 100)}%` }} />
+                  </div>
+                  <p className="mt-2 text-sm text-slate-500">{entry.insight || "Performance insight unavailable."}</p>
+                </article>
+              )) : (
+                <div className="rounded-2xl bg-slate-50 px-4 py-10 text-center text-sm text-slate-400">
+                  Team leaderboard data will appear here once activity is available.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-black text-slate-900">Algorithm Notes</h2>
+            <div className="mt-5 space-y-4 text-sm text-slate-600">
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Performance Score</p>
+                <p className="mt-2 font-semibold text-slate-800">
+                  {algorithm?.performanceScoreFormula || "0.40 * taskCompletionRatio + 0.35 * qualityScore + 0.25 * deadlineAdherence"}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Utilization Formula</p>
+                <p className="mt-2 font-semibold text-slate-800">
+                  {algorithm?.averageUtilizationFormula || "completed_tasks / total_tasks * 100"}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Interpretation</p>
+                <p className="mt-2 text-slate-600">
+                  Higher scores indicate stronger delivery consistency, better quality, and fewer missed deadlines.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-black text-slate-900">Recent Reviews</h2>

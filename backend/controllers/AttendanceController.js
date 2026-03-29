@@ -1,6 +1,16 @@
 import Attendance from "../models/Attendance.js";
 import { getEmployeeProfileByUserId } from "../utils/profileRefs.js";
 
+function parseTimeToMinutes(value = "09:00") {
+  const [hours = "0", minutes = "0"] = String(value).split(":");
+  return Number(hours) * 60 + Number(minutes);
+}
+
+function getClockMinutes(dateValue) {
+  const date = new Date(dateValue);
+  return date.getHours() * 60 + date.getMinutes();
+}
+
 // POST /api/attendance/clock-in
 export const clockIn = async (req, res) => {
   try {
@@ -22,13 +32,31 @@ export const clockIn = async (req, res) => {
       return res.status(400).json({ message: "Already clocked in today" });
     }
 
+    const officeStart = employeeProfile.officeHours?.start || "09:00";
+    const officeEnd = employeeProfile.officeHours?.end || "17:00";
+    const clockInTime = new Date();
+    const lateMinutes = Math.max(getClockMinutes(clockInTime) - parseTimeToMinutes(officeStart), 0);
+
     const attendance = await Attendance.create({
       employee : employeeProfile._id,
       date     : new Date(),
-      clockIn  : new Date()
+      clockIn  : clockInTime,
+      terminalId: req.body?.terminalId || "WEB",
+      officeStart,
+      officeEnd,
+      lateMinutes,
+      status: lateMinutes > 0 ? "LATE" : "ON_TIME"
     });
 
-    res.status(201).json({ message: "Clocked in successfully", attendance });
+    res.status(201).json({
+      message: "Clocked in successfully",
+      attendance,
+      alignment: {
+        officeStart,
+        officeEnd,
+        lateMinutes
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -57,13 +85,31 @@ export const clockOut = async (req, res) => {
       return res.status(400).json({ message: "Already clocked out today" });
     }
 
-    attendance.clockOut = new Date();
+    const clockOutTime = new Date();
+    const officeEnd = attendance.officeEnd || employeeProfile.officeHours?.end || "17:00";
+    const earlyExitMinutes = Math.max(parseTimeToMinutes(officeEnd) - getClockMinutes(clockOutTime), 0);
+    const overtimeHours = Math.max(getClockMinutes(clockOutTime) - parseTimeToMinutes(officeEnd), 0) / 60;
+
+    attendance.clockOut = clockOutTime;
+    attendance.terminalId = req.body?.terminalId || attendance.terminalId || "WEB";
+    attendance.earlyExitMinutes = earlyExitMinutes;
+    attendance.overtimeHours = +overtimeHours.toFixed(2);
+    attendance.status = earlyExitMinutes > 0 ? "EARLY_EXIT" : "COMPLETED";
     await attendance.save();
 
     // Compute hours worked
     const hoursWorked = +((attendance.clockOut - attendance.clockIn) / 36e5).toFixed(2);
 
-    res.json({ message: "Clocked out successfully", hoursWorked, attendance });
+    res.json({
+      message: "Clocked out successfully",
+      hoursWorked,
+      attendance,
+      alignment: {
+        officeEnd,
+        earlyExitMinutes,
+        overtimeHours: attendance.overtimeHours
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -93,7 +139,14 @@ export const getMyAttendance = async (req, res) => {
       ...r.toObject(),
       hoursWorked: r.clockIn && r.clockOut
         ? +((r.clockOut - r.clockIn) / 36e5).toFixed(2)
-        : null
+        : null,
+      alignment: {
+        officeStart: r.officeStart || "09:00",
+        officeEnd: r.officeEnd || "17:00",
+        lateMinutes: r.lateMinutes || 0,
+        earlyExitMinutes: r.earlyExitMinutes || 0,
+        overtimeHours: r.overtimeHours || 0
+      }
     }));
 
     res.json(enriched);
@@ -124,7 +177,14 @@ export const getAllAttendance = async (req, res) => {
       ...r.toObject(),
       hoursWorked: r.clockIn && r.clockOut
         ? +((r.clockOut - r.clockIn) / 36e5).toFixed(2)
-        : null
+        : null,
+      alignment: {
+        officeStart: r.officeStart || "09:00",
+        officeEnd: r.officeEnd || "17:00",
+        lateMinutes: r.lateMinutes || 0,
+        earlyExitMinutes: r.earlyExitMinutes || 0,
+        overtimeHours: r.overtimeHours || 0
+      }
     }));
 
     res.json(enriched);
@@ -159,6 +219,8 @@ export const getAttendanceSummary = async (req, res) => {
       }
       return sum;
     }, 0);
+    const totalLateMinutes = records.reduce((sum, r) => sum + (r.lateMinutes || 0), 0);
+    const totalOvertimeHours = records.reduce((sum, r) => sum + (r.overtimeHours || 0), 0);
 
     res.json({
       employeeId,
@@ -167,6 +229,8 @@ export const getAttendanceSummary = async (req, res) => {
       presentDays,
       completedDays,
       totalHoursWorked : +totalHours.toFixed(2),
+      totalLateMinutes,
+      totalOvertimeHours: +totalOvertimeHours.toFixed(2),
       avgHoursPerDay   : completedDays > 0
         ? +(totalHours / completedDays).toFixed(2)
         : 0

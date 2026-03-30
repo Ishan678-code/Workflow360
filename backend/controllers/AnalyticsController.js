@@ -8,6 +8,7 @@ import Freelancer from "../models/Freelancer.js";
 import Invoice from "../models/Invoice.js";
 import User from "../models/User.js";
 import Department from "../models/Department.js";
+import PerformanceReview from "../models/Performance.js";
 import { computePerformanceScore, computeTeamPerformance } from "../services/Performanceservice.js";
 import { generateAttendanceReportPDF, generatePerformanceReportPDF } from "../services/pdfService.js";
 import { getEmployeeProfileByUserId, getFreelancerProfileByUserId } from "../utils/profileRefs.js";
@@ -328,12 +329,30 @@ export const getTeamPerformanceLeaderboard = async (req, res) => {
       return res.json({ message: "No activity data found", leaderboard: [] });
     }
 
+    // Fetch quality ratings from both sources in parallel
+    const [reviewRatings, timesheetRatings] = await Promise.all([
+      PerformanceReview.aggregate([
+        { $match: { createdAt: { $gte: since } } },
+        { $group: { _id: "$user", ratings: { $push: "$rating" } } }
+      ]),
+      Timesheet.aggregate([
+        { $match: { status: "APPROVED", date: { $gte: since }, qualityRating: { $ne: null } } },
+        { $group: { _id: "$freelancer", ratings: { $push: "$qualityRating" } } }
+      ])
+    ]);
+
+    const reviewMap   = new Map(reviewRatings.map(r => [String(r._id), r.ratings]));
+    const timesheetMap = new Map(timesheetRatings.map(r => [String(r._id), r.ratings]));
+
     // Build usersMetrics array for batch processing
     const usersMetrics = taskAggregation.map(u => ({
       userId          : u._id,
       completedTasks  : u.completedTasks,
       totalTasks      : u.totalTasks,
-      qualityRatings  : [],   // can be extended when PerformanceReview is connected
+      qualityRatings  : [
+        ...(reviewMap.get(String(u._id)) || []),
+        ...(timesheetMap.get(String(u._id)) || [])
+      ],
       missedDeadlines : u.missedDeadlines,
       totalDeadlines  : u.totalDeadlines
     }));

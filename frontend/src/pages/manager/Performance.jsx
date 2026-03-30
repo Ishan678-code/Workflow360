@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import ManagerLayout from "../../layouts/ManagerLayout";
 import { analyticsApi, performanceApi } from "../../services/api";
+import { downloadBlob } from "../../utils/formatters";
+import { Download } from "lucide-react";
 
 const fallbackCards = [
   { label: "High Performers", value: "8" },
@@ -19,6 +21,7 @@ export default function ManagerPerformance() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [algorithm, setAlgorithm] = useState(null);
   const [error, setError] = useState("");
+  const [downloadingId, setDownloadingId] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -69,6 +72,16 @@ export default function ManagerPerformance() {
     };
   }, []);
 
+  async function handleDownload(userId, name) {
+    setDownloadingId(userId);
+    try {
+      const blob = await analyticsApi.downloadPerformanceReport(userId, 30);
+      downloadBlob(blob, `performance-${name || userId}.pdf`);
+    } catch {} finally {
+      setDownloadingId(null);
+    }
+  }
+
   return (
     <ManagerLayout>
       <div className="space-y-6">
@@ -110,7 +123,19 @@ export default function ManagerPerformance() {
                   <div className="mt-4 h-2 rounded-full bg-white">
                     <div className="h-full rounded-full bg-slate-900" style={{ width: `${Math.min((entry.score || 0) * 100, 100)}%` }} />
                   </div>
-                  <p className="mt-2 text-sm text-slate-500">{entry.insight || "Performance insight unavailable."}</p>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <p className="text-sm text-slate-500">{entry.insight || "Performance insight unavailable."}</p>
+                    {entry.userId && (
+                      <button
+                        onClick={() => handleDownload(entry.userId, entry.name)}
+                        disabled={downloadingId === entry.userId}
+                        className="flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 shadow-sm ring-1 ring-slate-100 transition hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        <Download size={11} />
+                        {downloadingId === entry.userId ? "..." : "PDF"}
+                      </button>
+                    )}
+                  </div>
                 </article>
               )) : (
                 <div className="rounded-2xl bg-slate-50 px-4 py-10 text-center text-sm text-slate-400">

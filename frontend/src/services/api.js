@@ -233,6 +233,10 @@ export const analyticsApi = {
     if (period) params.append("period", period);
     return request(`/analytics/team-performance${params.toString() ? `?${params}` : ""}`);
   },
+  downloadPerformanceReport: (userId, period) => {
+    const params = period ? `?period=${period}` : "";
+    return requestBlob(`/analytics/report/performance/${userId}${params}`);
+  },
 };
 
 export { BASE_URL };

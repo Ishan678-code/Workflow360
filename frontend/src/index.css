@@ -10,9 +10,33 @@
 
 :root {
   font-family: 'Inter', sans-serif;
+  color-scheme: light;
+  --bg: #FDFDFF;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: #0f172a;
+  --surface: #0f172a;
+  --surface-muted: #111827;
+  --text: #f8fafc;
+  --muted: #94a3b8;
+  --border: #334155;
 }
 
 body {
   margin: 0;
-  background-color: #FDFDFF; /* Matches your EmployeeLayout bg */
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+.surface {
+  background-color: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
 }

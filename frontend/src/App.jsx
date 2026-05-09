@@ -1,5 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login            from "./pages/Login";
+import Register        from "./pages/Register";
+import ForgotPassword  from "./pages/ForgotPassword";
+import NotFound        from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminPeople from "./pages/admin/People";
@@ -27,6 +30,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/"                      element={<Login />} />
+        <Route path="/register"              element={<Register />} />
+        <Route path="/forgot-password"       element={<ForgotPassword />} />
 
         <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
           <Route path="/admin/dashboard"       element={<AdminDashboard />} />
@@ -60,7 +65,7 @@ export default function App() {
           <Route path="/freelancer/invoices"   element={<FreelancerInvoices />} />
         </Route>
 
-        <Route path="*"                      element={<Navigate to="/" replace />} />
+        <Route path="*"                      element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );

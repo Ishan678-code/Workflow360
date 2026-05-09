@@ -3,34 +3,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import { authApi } from "../services/api";
 
-// ── Animated bar chart ────────────────────────────────────────────────────────
-const bars = [
-  { h: 112, color: "#3b82f6", delay: "0ms" },
-  { h: 80,  color: "#1e40af", delay: "100ms" },
-  { h: 96,  color: "#2563eb", delay: "200ms" },
-  { h: 64,  color: "#1e3a8a", delay: "300ms" },
-  { h: 128, color: "#60a5fa", delay: "400ms" },
-  { h: 80,  color: "#3b82f6", delay: "500ms" },
-  { h: 112, color: "#93c5fd", delay: "600ms" },
-];
-
-const BarChart = () => (
-  <div className="flex items-end gap-2.5 justify-center px-4">
-    {bars.map((b, i) => (
-      <div
-        key={i}
-        style={{
-          height: b.h,
-          backgroundColor: b.color,
-          animationDelay: b.delay,
-          boxShadow: `0 0 12px ${b.color}55`,
-        }}
-        className="w-10 rounded-t-lg animate-[grow_0.6s_ease-out_both]"
-      />
-    ))}
-  </div>
-);
-
 // ── Eye icons ────────────────────────────────────────────────────────────────
 const EyeIcon = () => (
   <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -53,13 +25,6 @@ const Spinner = () => (
   </svg>
 );
 
-// ── Feature list (right panel) ─────────────────────────────────────────────
-const features = [
-  { icon: "⏱", label: "Real-time attendance tracking" },
-  { icon: "📋", label: "Leave & payroll management" },
-  { icon: "📊", label: "AI-powered performance insights" },
-];
-
 const ROLES = [
   { key: "ADMIN",      label: "Admin",      icon: "🛡️" },
   { key: "MANAGER",    label: "Manager",    icon: "📊" },
@@ -74,24 +39,28 @@ const roleRoutes = {
   FREELANCER : "/freelancer/dashboard",
 };
 
-export default function Login() {
+const features = [
+  { icon: "🔒", label: "Secure role-based access control" },
+  { icon: "🚀", label: "Get started in seconds" },
+  { icon: "🤝", label: "Join your team instantly" },
+];
+
+export default function Register() {
   const navigate = useNavigate();
   const existingToken = localStorage.getItem("token");
   const existingUser = (() => {
-    try {
-      return JSON.parse(localStorage.getItem("user") || "null");
-    } catch {
-      return null;
-    }
+    try { return JSON.parse(localStorage.getItem("user") || "null"); } catch { return null; }
   })();
 
+  const [name, setName]             = useState("");
   const [email, setEmail]           = useState("");
   const [password, setPassword]     = useState("");
+  const [confirmPw, setConfirmPw]   = useState("");
   const [showPw, setShowPw]         = useState(false);
-  const [remember, setRemember]     = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [selectedRole, setSelectedRole] = useState("EMPLOYEE");
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState("");
-  const [selectedRole, setSelectedRole] = useState("EMPLOYEE");
 
   useEffect(() => {
     if (existingToken && existingUser?.role) {
@@ -99,25 +68,33 @@ export default function Login() {
     }
   }, [existingToken, existingUser?.role, navigate]);
 
+  const validate = () => {
+    if (!name.trim()) return "Full name is required.";
+    if (!email.trim()) return "Email address is required.";
+    if (password.length < 6) return "Password must be at least 6 characters.";
+    if (password !== confirmPw) return "Passwords do not match.";
+    return null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
+
+    const validationError = validate();
+    if (validationError) { setError(validationError); return; }
+
     setLoading(true);
     try {
-      const data = await authApi.login(email, password);
-
-      if (data.user.role !== selectedRole) {
-        const roleLabel = ROLES.find((r) => r.key === data.user.role)?.label ?? data.user.role;
-        setError(`These credentials belong to a ${roleLabel} account. Please select the correct role.`);
-        return;
-      }
-
+      await authApi.register({ name: name.trim(), email: email.trim(), password, role: selectedRole });
+      // Auto-login immediately after registration
+      const data = await authApi.login(email.trim(), password);
       localStorage.setItem("token", data.token);
-      localStorage.setItem("user",  JSON.stringify(data.user));
-      toast.success(`Welcome back, ${data.user.name}!`);
-      navigate(roleRoutes[data.user.role]);
-    } catch (error) {
-      setError(error.message || "Login failed");
+      localStorage.setItem("user", JSON.stringify(data.user));
+      toast.success(`Welcome to Workforce360, ${data.user.name}!`);
+      navigate(roleRoutes[data.user.role], { replace: true });
+    } catch (err) {
+      setError(err.message || "Registration failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -125,12 +102,7 @@ export default function Login() {
 
   return (
     <>
-      {/* keyframe for bar chart grow animation */}
       <style>{`
-        @keyframes grow {
-          from { transform: scaleY(0); transform-origin: bottom; opacity: 0; }
-          to   { transform: scaleY(1); transform-origin: bottom; opacity: 1; }
-        }
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(16px); }
           to   { opacity: 1; transform: translateY(0); }
@@ -143,12 +115,12 @@ export default function Login() {
         {/* ── Left panel ─────────────────────────────────────────────────── */}
         <div className="relative w-full md:w-1/2 bg-slate-50 flex flex-col justify-center items-center px-8 py-12 overflow-hidden">
 
-          {/* Subtle background blobs */}
+          {/* Background blobs */}
           <div className="absolute top-[-80px] left-[-80px] w-72 h-72 bg-blue-100 rounded-full blur-3xl opacity-50 pointer-events-none" />
           <div className="absolute bottom-[-60px] right-[-60px] w-56 h-56 bg-indigo-100 rounded-full blur-3xl opacity-40 pointer-events-none" />
 
           {/* Logo */}
-          <div className="fade-up flex items-center gap-2.5 mb-10 self-start md:self-center" style={{ animationDelay: "0ms" }}>
+          <div className="fade-up flex items-center gap-2.5 mb-8 self-start md:self-center" style={{ animationDelay: "0ms" }}>
             <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shadow-md shadow-blue-200">
               <span className="text-white font-extrabold text-sm tracking-tight">W</span>
             </div>
@@ -163,8 +135,8 @@ export default function Login() {
             {/* Top accent line */}
             <div className="absolute top-0 left-8 right-8 h-0.5 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-400" />
 
-            <h1 className="text-[22px] font-bold text-slate-800 mb-1 tracking-tight">Welcome back</h1>
-            <p className="text-[13px] text-slate-400 mb-5">Sign in to your account to continue</p>
+            <h1 className="text-[22px] font-bold text-slate-800 mb-1 tracking-tight">Create an account</h1>
+            <p className="text-[13px] text-slate-400 mb-5">Fill in your details to get started</p>
 
             {/* Role Selector */}
             <div className="grid grid-cols-4 gap-2 mb-6">
@@ -200,11 +172,22 @@ export default function Login() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
 
+              {/* Full Name */}
+              <div className="space-y-1.5">
+                <label className="block text-[13px] font-semibold text-slate-600">Full Name</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="John Doe"
+                  required
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[13.5px] text-slate-800 placeholder-slate-300 outline-none focus:bg-white focus:border-blue-400 focus:ring-3 focus:ring-blue-50 transition-all duration-200"
+                />
+              </div>
+
               {/* Email */}
               <div className="space-y-1.5">
-                <label className="block text-[13px] font-semibold text-slate-600">
-                  Email Address
-                </label>
+                <label className="block text-[13px] font-semibold text-slate-600">Email Address</label>
                 <input
                   type="email"
                   value={email}
@@ -217,23 +200,13 @@ export default function Login() {
 
               {/* Password */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[13px] font-semibold text-slate-600">
-                    Password
-                  </label>
-                  <Link
-                    to="/forgot-password"
-                    className="text-[12px] text-blue-500 hover:text-blue-700 font-medium transition-colors"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
+                <label className="block text-[13px] font-semibold text-slate-600">Password</label>
                 <div className="relative">
                   <input
                     type={showPw ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
+                    placeholder="Min. 6 characters"
                     required
                     className="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-slate-200 bg-slate-50 text-[13.5px] text-slate-800 placeholder-slate-300 outline-none focus:bg-white focus:border-blue-400 focus:ring-3 focus:ring-blue-50 transition-all duration-200"
                   />
@@ -247,27 +220,34 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Remember me */}
-              <label className="flex items-center gap-2.5 cursor-pointer group">
+              {/* Confirm Password */}
+              <div className="space-y-1.5">
+                <label className="block text-[13px] font-semibold text-slate-600">Confirm Password</label>
                 <div className="relative">
                   <input
-                    type="checkbox"
-                    checked={remember}
-                    onChange={(e) => setRemember(e.target.checked)}
-                    className="sr-only"
+                    type={showConfirm ? "text" : "password"}
+                    value={confirmPw}
+                    onChange={(e) => setConfirmPw(e.target.value)}
+                    placeholder="Re-enter your password"
+                    required
+                    className={`w-full px-3.5 py-2.5 pr-10 rounded-xl border bg-slate-50 text-[13.5px] text-slate-800 placeholder-slate-300 outline-none focus:bg-white focus:ring-3 transition-all duration-200
+                      ${confirmPw && password !== confirmPw
+                        ? "border-red-300 focus:border-red-400 focus:ring-red-50"
+                        : "border-slate-200 focus:border-blue-400 focus:ring-blue-50"
+                      }`}
                   />
-                  <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all duration-150 ${remember ? "bg-blue-600 border-blue-600" : "border-slate-300 bg-white group-hover:border-blue-400"}`}>
-                    {remember && (
-                      <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(!showConfirm)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showConfirm ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
                 </div>
-                <span className="text-[13px] text-slate-500 group-hover:text-slate-700 transition-colors select-none">
-                  Keep me signed in
-                </span>
-              </label>
+                {confirmPw && password !== confirmPw && (
+                  <p className="text-[11.5px] text-red-500">Passwords do not match</p>
+                )}
+              </div>
 
               {/* Submit */}
               <button
@@ -278,28 +258,25 @@ export default function Login() {
                 {loading ? (
                   <>
                     <Spinner />
-                    <span>Signing in…</span>
+                    <span>Creating account…</span>
                   </>
                 ) : (
-                  "Sign In"
+                  "Create Account"
                 )}
               </button>
             </form>
 
-            {/* Register link */}
+            {/* Sign in link */}
             <p className="mt-5 text-center text-[13px] text-slate-400">
-              Don't have an account?{" "}
-              <Link to="/register" className="text-blue-500 hover:text-blue-700 font-semibold transition-colors">
-                Create one
+              Already have an account?{" "}
+              <Link to="/" className="text-blue-500 hover:text-blue-700 font-semibold transition-colors">
+                Sign in
               </Link>
             </p>
           </div>
 
           {/* Footer */}
-          <p
-            className="fade-up mt-6 text-[12px] text-slate-400"
-            style={{ animationDelay: "160ms" }}
-          >
+          <p className="fade-up mt-6 text-[12px] text-slate-400" style={{ animationDelay: "160ms" }}>
             © {new Date().getFullYear()} Workforce360. All rights reserved.
           </p>
         </div>
@@ -318,30 +295,19 @@ export default function Login() {
             }}
           />
 
-          {/* Glow behind chart */}
+          {/* Glow */}
           <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-40 bg-blue-600 rounded-full blur-[80px] opacity-15 pointer-events-none" />
 
-          {/* Chart container */}
-          <div className="relative z-10 bg-white/5 border border-white/10 rounded-2xl px-8 pt-8 pb-4 backdrop-blur-sm w-full max-w-sm">
-            {/* Chart header */}
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <p className="text-[11px] text-slate-400 uppercase tracking-widest">This Month</p>
-                <p className="text-white font-bold text-lg leading-tight">Productivity</p>
-              </div>
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                <span className="text-emerald-400 text-[11px] font-semibold">+12.4%</span>
-              </div>
+          {/* Icon card */}
+          <div className="relative z-10 bg-white/5 border border-white/10 rounded-2xl px-8 py-10 backdrop-blur-sm w-full max-w-sm flex flex-col items-center gap-5">
+            <div className="w-16 h-16 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center">
+              <svg className="w-8 h-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
             </div>
-
-            <BarChart />
-
-            {/* X-axis labels */}
-            <div className="flex justify-between mt-2 px-1">
-              {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
-                <span key={i} className="text-[10px] text-slate-600 w-10 text-center">{d}</span>
-              ))}
+            <div className="text-center">
+              <p className="text-[11px] text-slate-400 uppercase tracking-widest mb-1">Join Workforce360</p>
+              <p className="text-white font-bold text-lg leading-tight">Your workspace awaits</p>
             </div>
           </div>
 
@@ -353,7 +319,7 @@ export default function Login() {
             </h2>
             <p className="text-slate-400 text-[13px] leading-relaxed mb-8">
               Manage your hybrid workforce with ease. Track time, approve leaves,
-              and boost productivity.
+              and boost productivity from day one.
             </p>
 
             {/* Feature pills */}

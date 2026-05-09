@@ -4,23 +4,6 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { attendanceApi } from "../../services/api";
 
 // ── Sample attendance data keyed by "YYYY-MM-DD" ──────────────────────────
-const attendanceData = {
-  "2026-03-02": { in: "9:00 AM", out: "5:30 PM", hours: 8.5 },
-  "2026-03-03": { in: "8:45 AM", out: "5:05 PM", hours: 8.5 },
-  "2026-03-04": { in: "9:15 AM", out: "5:45 PM", hours: 8.5 },
-  "2026-03-05": { in: "9:00 AM", out: "5:00 PM", hours: 8 },
-  "2026-03-06": { in: "9:00 AM", out: "5:30 PM", hours: 8.5 },
-  "2026-03-09": { in: "9:00 AM", out: "5:00 PM", hours: 8 },
-  "2026-03-10": { in: "8:30 AM", out: "5:00 PM", hours: 8.5 },
-  "2026-03-11": { in: "9:10 AM", out: "5:40 PM", hours: 8.5 },
-  "2026-03-12": { in: "9:00 AM", out: "5:00 PM", hours: 8 },
-  "2026-03-13": { in: "9:00 AM", out: "5:30 PM", hours: 8.5 },
-  "2026-03-16": { in: "9:00 AM", out: "5:00 PM", hours: 8 },
-  "2026-03-17": { in: "9:00 AM", out: "5:30 PM", hours: 8.5 },
-  "2026-03-18": { in: "9:05 AM", out: "5:35 PM", hours: 8.5 },
-  "2026-03-19": { in: "9:00 AM", out: "5:00 PM", hours: 8 },
-  "2026-03-20": { in: "9:00 AM", out: "5:30 PM", hours: 8.5 },
-};
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
@@ -45,7 +28,15 @@ export default function Timesheet() {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0-indexed
-  const [records, setRecords] = useState(attendanceData);
+  const [records, setRecords] = useState({});
+
+  const monthKey = `${viewYear}-${pad(viewMonth + 1)}`;
+  const monthSummary = useMemo(() => {
+    const entries = Object.entries(records).filter(([key]) => key.startsWith(monthKey));
+    const totalDays = entries.length;
+    const totalHours = entries.reduce((sum, [, row]) => sum + Number(row.hours || 0), 0);
+    return { totalDays, totalHours };
+  }, [records, monthKey]);
 
   useEffect(() => {
     let active = true;
@@ -65,7 +56,7 @@ export default function Timesheet() {
           return acc;
         }, {});
 
-        setRecords(Object.keys(mapped).length ? mapped : attendanceData);
+        setRecords(mapped);
       } catch {}
     }
 
@@ -109,7 +100,35 @@ export default function Timesheet() {
         {/* Calendar Card */}
         <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
 
-          {/* Calendar Header */}
+          {/* Summary Cards */}
+        <div className="grid gap-4 md:grid-cols-3 px-6 py-5 border-b border-slate-50">
+          <div className="rounded-3xl bg-slate-50 p-5">
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Days with attendance</p>
+            <p className="mt-3 text-3xl font-black text-slate-900">{monthSummary.totalDays}</p>
+          </div>
+          <div className="rounded-3xl bg-slate-50 p-5">
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Total hours logged</p>
+            <p className="mt-3 text-3xl font-black text-slate-900">{monthSummary.totalHours.toFixed(1)}h</p>
+          </div>
+          <div className="rounded-3xl bg-slate-50 p-5">
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Month</p>
+            <p className="mt-3 text-3xl font-black text-slate-900">{MONTHS[viewMonth]}</p>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3 text-sm text-slate-500 bg-slate-50">
+          <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-blue-500" /> Present
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-slate-300" /> No record
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2">
+            <span className="h-2.5 w-2.5 rounded-full border border-blue-600 bg-white" /> Today
+          </span>
+        </div>
+
+        {/* Calendar Header */}
           <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between">
             <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">
               Monthly Calendar
@@ -155,7 +174,7 @@ export default function Timesheet() {
               return (
                 <div
                   key={idx}
-                  className={`min-h-[100px] p-2.5 border-b border-r border-slate-50 last:border-r-0
+                  className={`min-h-25 p-2.5 border-b border-r border-slate-50 last:border-r-0
                     ${rec ? "bg-blue-50/40" : "bg-white"}
                     ${!day ? "bg-slate-50/30" : ""}
                   `}

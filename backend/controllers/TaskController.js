@@ -1,5 +1,7 @@
 import Task from "../models/Task.js";
+import User from "../models/User.js";
 import { prioritizeTasks, quadrantSummary } from "../services/taskPriorityService.js";
+import { createNotification } from "../services/notificationService.js";
 
 export const createTask = async (req, res) => {
   try {
@@ -20,6 +22,19 @@ export const createTask = async (req, res) => {
       tags: tags || [],
       status: "TODO"
     });
+
+    if (assignee) {
+      const creator = await User.findById(req.user.id).select("name");
+      const creatorName = creator?.name || "A team member";
+
+      await createNotification(
+        assignee,
+        "New task assigned",
+        `${creatorName} assigned you a new task: ${title}.`,
+        "TASK",
+        { taskId: task._id.toString(), project }
+      );
+    }
 
     res.status(201).json({ message: "Task created", task });
   } catch (error) {

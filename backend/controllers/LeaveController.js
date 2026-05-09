@@ -1,7 +1,9 @@
 import Leave from "../models/Leave.js";
 import Employee from "../models/Employee.js";
 import Department from "../models/Department.js";
+import User from "../models/User.js";
 import { getEmployeeProfileByUserId } from "../utils/profileRefs.js";
+import { createNotification } from "../services/notificationService.js";
 
 const LEAVE_LIMITS = {
   VACATION: { balanceKey: "annual", maxPerRequest: 10 },
@@ -21,7 +23,9 @@ function countDays(from, to) {
 
 export const applyLeave = async (req, res) => {
   try {
-    const employeeProfile = await Employee.findOne({ userId: req.user.id }).populate("department", "name");
+    const employeeProfile = await Employee.findOne({ userId: req.user.id })
+      .populate("department", "name head")
+      .populate("userId", "name");
     if (!employeeProfile) {
       return res.status(404).json({ message: "Employee profile not found" });
     }
@@ -76,6 +80,23 @@ export const applyLeave = async (req, res) => {
       status: "PENDING",
       approvalDepartment: employeeProfile.department?._id
     });
+
+    const applicantName = employeeProfile.userId?.name || "A colleague";
+    const recipients = new Set();
+    if (employeeProfile.manager) recipients.add(employeeProfile.manager.toString());
+    if (employeeProfile.department?.head) recipients.add(employeeProfile.department.head.toString());
+
+    await Promise.all(
+      [...recipients].map((recipientId) =>
+        createNotification(
+          recipientId,
+          "Leave request submitted",
+          `${applicantName} has requested ${normalizedType.toLowerCase()} leave from ${fromDate.toDateString()} to ${toDate.toDateString()}.`,
+          "LEAVE",
+          { leaveId: leave._id.toString() }
+        )
+      )
+    );
 
     res.status(201).json({ message: "Leave applied", leave });
   } catch (error) {
@@ -177,6 +198,16 @@ export const approveLeave = async (req, res) => {
     leave.employee.leaveBalance[balanceKey] = currentBalance - leave.totalDays;
     await leave.employee.save();
 
+    if (leave.employee?.userId) {
+      await createNotification(
+        leave.employee.userId._id || leave.employee.userId,
+        "Leave approved",
+        `Your ${leave.type.toLowerCase()} leave request has been approved.`,
+        "LEAVE",
+        { leaveId: leave._id.toString() }
+      );
+    }
+
     res.json({ message: "Leave approved", leave });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -211,6 +242,16 @@ export const rejectLeave = async (req, res) => {
     leave.approvedBy = req.user.id;
     leave.comment = comment || "";
     await leave.save();
+
+    if (leave.employee?.userId) {
+      await createNotification(
+        leave.employee.userId._id || leave.employee.userId,
+        "Leave rejected",
+        `Your ${leave.type.toLowerCase()} leave request has been rejected.`,
+        "LEAVE",
+        { leaveId: leave._id.toString() }
+      );
+    }
 
     res.json({ message: "Leave rejected", leave });
   } catch (error) {

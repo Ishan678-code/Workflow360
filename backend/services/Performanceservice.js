@@ -19,14 +19,7 @@ function computeZScore(value, allValues) {
   return (value - mean) / sigma;
 }
 
-// ── Performance Score ─────────────────────────────────────────────────────────
-/**
- * Compute PS for a single user given their activity data + team context
- *
- * @param {Object} userMetrics   - { completedTasks, totalTasks, qualityRatings[], missedDeadlines, totalDeadlines }
- * @param {Object} teamContext   - { avgTasksCompleted, allUserScores[] }  (for relative scoring)
- * @returns {Object} full score breakdown + anomaly detection
- */
+
 export function computePerformanceScore(userMetrics, teamContext) {
   const {
     completedTasks,
@@ -100,14 +93,7 @@ export function computePerformanceScore(userMetrics, teamContext) {
   };
 }
 
-// ── Batch: Compute for all users, inject team context ────────────────────────
-/**
- * Compute performance scores for a list of users
- * Automatically builds team context (Tavg, allUserScores baseline)
- *
- * @param {Array} usersMetrics  - array of { userId, ...userMetrics }
- * @returns {Array} sorted results (highest score first)
- */
+
 export function computeTeamPerformance(usersMetrics) {
   if (!usersMetrics.length) return [];
 

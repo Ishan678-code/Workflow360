@@ -33,7 +33,7 @@ const StatusBadge = ({ status }) => {
     Processing: "bg-orange-50 text-orange-600 border-orange-100",
   };
   return (
-    <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider border Npr.{styles[status]}`}>
+    <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider border ${styles[status] || styles.Processing}`}>
       {status}
     </span>
   );

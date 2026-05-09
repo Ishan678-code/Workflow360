@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
-  Bell,
   Briefcase,
   ChevronRight,
   LayoutDashboard,
@@ -12,6 +11,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import Notifications from "../components/Notifications";
 import { authApi } from "../services/api";
 import { getInitials } from "../utils/formatters";
 
@@ -32,20 +32,22 @@ export default function AdminLayout({ children }) {
   const handleLogout = async () => {
     try {
       await authApi.logout();
-    } catch {}
+    } catch {
+      // Continue with local logout even if the server request fails.
+    }
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     navigate("/");
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-rose-600 selection:text-white">
+    <div className="min-h-screen bg-(--bg) text-(--text) font-sans selection:bg-rose-600 selection:text-white">
       <div
         className="fixed inset-0 z-0 pointer-events-none opacity-[0.04]"
         style={{ backgroundImage: "radial-gradient(#be123c 1px, transparent 1px)", backgroundSize: "22px 22px" }}
       />
 
-      <header className="sticky top-0 z-50 border-b border-rose-100 bg-white/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-rose-100 dark:border-rose-900/30 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           <div className="flex flex-1 items-center">
             <div className="flex items-center gap-3">
@@ -59,18 +61,17 @@ export default function AdminLayout({ children }) {
             </div>
           </div>
 
-          <nav className="hidden items-center rounded-2xl border border-rose-100 bg-rose-50/80 p-1 lg:flex">
+          <nav className="hidden items-center rounded-2xl border border-rose-100 dark:border-rose-900/30 bg-rose-50/80 dark:bg-slate-900/50 p-1 lg:flex">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
                   `flex items-center gap-2 rounded-xl px-4 py-2 text-[13px] font-bold transition-all duration-300 ${
-                    isActive ? "bg-white text-rose-700 shadow-sm ring-1 ring-rose-100" : "text-slate-500 hover:text-slate-900"
+                    isActive ? "bg-white dark:bg-slate-700/80 text-rose-700 dark:text-rose-300 shadow-sm ring-1 ring-rose-100 dark:ring-rose-900/30" : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                   }`
                 }
-              >
-                {({ isActive }) => (
+              >                {({ isActive }) => (
                   <>
                     <item.icon size={16} strokeWidth={isActive ? 2.5 : 2} />
                     <span className="whitespace-nowrap">{item.label}</span>
@@ -81,29 +82,26 @@ export default function AdminLayout({ children }) {
           </nav>
 
           <div className="flex flex-1 items-center justify-end gap-3 sm:gap-4">
-            <button className="relative p-2 text-slate-400 transition-colors hover:text-rose-600">
-              <Bell size={19} />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-rose-500" />
-            </button>
+            <Notifications />
 
-            <div className="flex items-center gap-3 border-l border-rose-100 pl-4">
+            <div className="flex items-center gap-3 border-l border-rose-100 dark:border-rose-900/30 pl-4">
               <div className="hidden flex-col items-end md:flex">
-                <span className="text-[13px] font-black leading-none text-slate-800">{user.name || "Administrator"}</span>
-                <span className="mt-1 text-[10px] font-bold uppercase text-slate-400">Admin</span>
+                <span className="text-[13px] font-black leading-none text-slate-800 dark:text-slate-100">{user.name || "Administrator"}</span>
+                <span className="mt-1 text-[10px] font-bold uppercase text-slate-400 dark:text-slate-400">Admin</span>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-rose-200 bg-gradient-to-tr from-rose-50 to-orange-100 text-xs font-black text-rose-700 shadow-sm">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-rose-200 dark:border-rose-900/30 bg-linear-to-tr from-rose-50 to-orange-100 dark:from-rose-900/30 dark:to-orange-900/30 text-xs font-black text-rose-700 dark:text-rose-300 shadow-sm">
                 {initials}
               </div>
               <button
                 onClick={handleLogout}
-                className="hidden p-2 text-slate-400 transition-colors hover:text-rose-500 md:flex"
+                className="hidden p-2 text-slate-400 transition-colors hover:text-rose-500 dark:text-slate-400 dark:hover:text-rose-400 md:flex"
                 title="Logout"
               >
                 <LogOut size={18} />
               </button>
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="ml-2 rounded-lg bg-rose-50 p-2 text-slate-600 lg:hidden"
+                className="ml-2 rounded-lg bg-rose-50 dark:bg-slate-900 p-2 text-slate-600 dark:text-slate-400 lg:hidden"
               >
                 {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
               </button>
@@ -113,11 +111,11 @@ export default function AdminLayout({ children }) {
       </header>
 
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-[60] lg:hidden">
+        <div className="fixed inset-0 z-60 lg:hidden">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
-          <aside className="absolute right-0 top-0 h-full w-72 bg-white p-6 shadow-2xl">
+          <aside className="absolute right-0 top-0 h-full w-72 bg-white dark:bg-slate-950 p-6 shadow-2xl">
             <div className="mb-10 flex items-center justify-between">
-              <span className="font-black text-slate-900">Navigation</span>
+              <span className="font-black text-slate-900 dark:text-slate-100">Navigation</span>
               <button onClick={() => setIsMobileMenuOpen(false)}>
                 <X size={20} />
               </button>
@@ -130,7 +128,7 @@ export default function AdminLayout({ children }) {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={({ isActive }) =>
                     `flex items-center justify-between rounded-xl px-4 py-3 text-[14px] font-bold transition-all ${
-                      isActive ? "bg-rose-600 text-white shadow-lg shadow-rose-200" : "text-slate-500 hover:bg-slate-50"
+                      isActive ? "bg-rose-600 dark:bg-rose-700 text-white shadow-lg shadow-rose-200 dark:shadow-rose-900/40" : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900"
                     }`
                   }
                 >

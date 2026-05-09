@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import EmployeeLayout from "../../layouts/EmployeeLayout";
 import { leaveApi } from "../../services/api";
 import { formatDate } from "../../utils/formatters";
@@ -40,14 +40,57 @@ const sampleHistory = [
   { type: "Compassionate", period: "Jan 20, 2026 – Jan 22, 2026",  reason: "Family emergency",    link: true  },
 ];
 
+const statusMeta = {
+  APPROVED : "bg-green-50 text-green-600 border-green-100",
+  REJECTED : "bg-red-50 text-red-600 border-red-100",
+  PENDING  : "bg-amber-50 text-amber-600 border-amber-100",
+};
+
+const StatusBadge = ({ status = "PENDING" }) => (
+  <span className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-semibold border ${statusMeta[status] || statusMeta.PENDING}`}>
+    {status.charAt(0) + status.slice(1).toLowerCase()}
+  </span>
+);
+
+const LeaveSummaryCard = ({ label, value, tone = "slate" }) => (
+  <div className={`rounded-3xl border border-slate-100 bg-white p-5 shadow-sm`}> 
+    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">{label}</p>
+    <p className={`mt-3 text-3xl font-black ${tone === "blue" ? "text-blue-600" : tone === "green" ? "text-emerald-600" : tone === "amber" ? "text-amber-600" : "text-slate-800"}`}>
+      {value}
+    </p>
+  </div>
+);
+
 const leaveTypes = ["Annual", "Sick", "Casual", "Compassionate"];
 
+// today in YYYY-MM-DD, local time
+function todayStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export default function ApplyLeave() {
+  const today = todayStr();
   const [form, setForm]       = useState({ type: "", from: "", to: "", reason: "" });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [history, setHistory] = useState(sampleHistory);
+  const [history, setHistory] = useState([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [error, setError]     = useState("");
+
+  const historySummary = useMemo(() => {
+    const stats = { total: history.length, approved: 0, pending: 0, rejected: 0 };
+    history.forEach((item) => {
+      const status = String(item.status || "PENDING").toUpperCase();
+      if (status === "APPROVED") stats.approved += 1;
+      else if (status === "REJECTED") stats.rejected += 1;
+      else stats.pending += 1;
+    });
+    return stats;
+  }, [history]);
 
   useEffect(() => {
     let active = true;
@@ -57,14 +100,19 @@ export default function ApplyLeave() {
         const data = await leaveApi.getMyLeaves();
         if (!active) return;
         const rows = Array.isArray(data) ? data : data?.data || [];
-        if (!rows.length) return;
         setHistory(rows.map((item) => ({
           type: item.type || "Leave",
           period: item.to ? `${formatDate(item.from)} – ${formatDate(item.to)}` : formatDate(item.from),
           reason: item.reason || "No reason provided",
+          status: item.status || "PENDING",
           link: false,
         })));
-      } catch {}
+      } catch {
+        // API unreachable — fall back to sample so page isn't empty
+        if (active) setHistory(sampleHistory);
+      } finally {
+        if (active) setHistoryLoaded(true);
+      }
     }
 
     loadHistory();
@@ -73,10 +121,30 @@ export default function ApplyLeave() {
     };
   }, []);
 
+  const handleFromChange = (e) => {
+    const newFrom = e.target.value;
+    // If end date is now before the new start date, clear it
+    setForm((prev) => ({
+      ...prev,
+      from: newFrom,
+      to: prev.to && prev.to < newFrom ? "" : prev.to,
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
+
+    if (form.from < today) {
+      setError("Start date cannot be in the past.");
+      return;
+    }
+    if (form.to && form.to < form.from) {
+      setError("End date cannot be before start date.");
+      return;
+    }
+
+    setLoading(true);
     try {
       await leaveApi.apply({
         ...form,
@@ -86,8 +154,11 @@ export default function ApplyLeave() {
       setHistory((prev) => [
         {
           type: form.type,
-          period: `${formatDate(form.from)} – ${formatDate(form.to)}`,
+          period: form.from === form.to
+            ? formatDate(form.from)
+            : `${formatDate(form.from)} – ${formatDate(form.to)}`,
           reason: form.reason || "No reason provided",
+          status: "PENDING",
           link: false,
         },
         ...prev,
@@ -106,7 +177,13 @@ export default function ApplyLeave() {
       {/* Page header */}
       <div className="mb-6 text-center">
         <h1 className="text-xl font-bold text-slate-800">Apply for Leave</h1>
-        <p className="text-[13px] text-slate-400 mt-1">Submit a new leave request and view your leave history</p>
+        <p className="text-[13px] text-slate-400 mt-1">Submit a new leave request and review your leave history.</p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 max-w-5xl mx-auto mb-6">
+        <LeaveSummaryCard label="Total requests" value={historySummary.total} tone="slate" />
+        <LeaveSummaryCard label="Pending approvals" value={historySummary.pending} tone="amber" />
+        <LeaveSummaryCard label="Approved leaves" value={historySummary.approved} tone="green" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6 max-w-5xl mx-auto">
@@ -156,13 +233,17 @@ export default function ApplyLeave() {
 
             {/* Start Date */}
             <div>
-              <label className="block text-[12.5px] font-semibold text-slate-600 mb-1.5">Start Date</label>
+              <label className="block text-[12.5px] font-semibold text-slate-600 mb-1.5">
+                Start Date
+                <span className="ml-1.5 text-[11px] font-normal text-slate-400">(today or later)</span>
+              </label>
               <div className="relative">
                 <input
                   type="date"
                   value={form.from}
-                  onChange={(e) => setForm({ ...form, from: e.target.value })}
+                  onChange={handleFromChange}
                   required
+                  min={today}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[13px] text-slate-700 outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all"
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -173,14 +254,17 @@ export default function ApplyLeave() {
 
             {/* End Date */}
             <div>
-              <label className="block text-[12.5px] font-semibold text-slate-600 mb-1.5">End Date</label>
+              <label className="block text-[12.5px] font-semibold text-slate-600 mb-1.5">
+                End Date
+                <span className="ml-1.5 text-[11px] font-normal text-slate-400">(same day or later)</span>
+              </label>
               <div className="relative">
                 <input
                   type="date"
                   value={form.to}
                   onChange={(e) => setForm({ ...form, to: e.target.value })}
                   required
-                  min={form.from}
+                  min={form.from || today}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[13px] text-slate-700 outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all"
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -228,39 +312,45 @@ export default function ApplyLeave() {
 
           {/* Table */}
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="text-left text-[11px] uppercase tracking-widest text-slate-400 font-semibold pb-3 pr-4">Type</th>
-                  <th className="text-left text-[11px] uppercase tracking-widest text-slate-400 font-semibold pb-3 pr-4">Period</th>
-                  <th className="text-left text-[11px] uppercase tracking-widest text-slate-400 font-semibold pb-3">Reason</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {history.map((row, i) => (
-                  <tr key={i} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3.5 pr-4">
-                      <TypeBadge type={row.type} />
-                    </td>
-                    <td className="py-3.5 pr-4">
-                      <span className="text-[12.5px] text-slate-600 leading-snug">{row.period}</span>
-                    </td>
-                    <td className="py-3.5">
-                      {row.link ? (
-                        <span className="text-[12.5px] text-blue-500 hover:underline cursor-pointer font-medium">{row.reason}</span>
-                      ) : (
-                        <span className="text-[12.5px] text-slate-600">{row.reason}</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {!historyLoaded ? (
+              <div className="py-12 text-center text-slate-400 text-[13px]">Loading history…</div>
+            ) : (
+              <>
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="text-left text-[11px] uppercase tracking-widest text-slate-400 font-semibold pb-3 pr-4">Type</th>
+                      <th className="text-left text-[11px] uppercase tracking-widest text-slate-400 font-semibold pb-3 pr-4">Period</th>
+                      <th className="text-left text-[11px] uppercase tracking-widest text-slate-400 font-semibold pb-3 pr-4">Status</th>
+                      <th className="text-left text-[11px] uppercase tracking-widest text-slate-400 font-semibold pb-3">Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {history.map((row, i) => (
+                      <tr key={i} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-3.5 pr-4">
+                          <TypeBadge type={row.type} />
+                        </td>
+                        <td className="py-3.5 pr-4">
+                          <span className="text-[12.5px] text-slate-600 leading-snug">{row.period}</span>
+                        </td>
+                        <td className="py-3.5 pr-4">
+                          <StatusBadge status={row.status} />
+                        </td>
+                        <td className="py-3.5">
+                          <span className="text-[12.5px] text-slate-600">{row.reason}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
 
-            {history.length === 0 && (
-              <div className="py-12 text-center text-slate-400 text-[13px]">
-                No leave history found.
-              </div>
+                {history.length === 0 && (
+                  <div className="py-12 text-center text-slate-400 text-[13px]">
+                    No leave history yet. Submit your first request!
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

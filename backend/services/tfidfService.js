@@ -1,9 +1,4 @@
-/**
- * TF-IDF + Cosine Similarity Service
- * Based on notebook formula:
- *   TF-IDF(t,d) = tf(t,d) × log( N / df(t) + 1 )
- *   Cosine Similarity S(J,P) = (J⃗ · P⃗) / (||J⃗|| × ||P⃗||)
- */
+
 
 const STOP_WORDS = new Set([
   "a","an","the","and","or","but","in","on","at","to","for","of","with",
@@ -164,15 +159,7 @@ export function cosineSimilarity(vecA, vecB) {
   return dot / (magA * magB);
 }
 
-// ── Main Matching Function ────────────────────────────────────────────────────
-/**
- * Score all freelancers against a job description using TF-IDF + Cosine Similarity
- *
- * @param {Object}   job         - { description, requiredSkills[] }
- * @param {Object[]} freelancers - [{ _id, skills[], portfolioUrl, hourlyRate, userId }]
- * @param {Number}   topN        - return top N results (default: all)
- * @returns {Array} ranked results with score breakdown
- */
+
 export function rankFreelancers(job, freelancers, topN = null) {
   const requestedTopN = Number.isFinite(Number(topN)) && Number(topN) > 0
     ? Math.floor(Number(topN))

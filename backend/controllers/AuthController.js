@@ -85,3 +85,47 @@ export const getMe = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+export const checkEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email is required" });
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "No account found with this email address" });
+    if (!user.isActive) return res.status(403).json({ message: "This account has been deactivated. Contact your administrator." });
+
+    res.json({ message: "Email verified" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) {
+      return res.status(400).json({ message: "Email and new password are required" });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "No account found with this email address" });
+
+    const isSame = await bcrypt.compare(newPassword, user.password);
+    if (isSame) {
+      return res.status(400).json({ message: "New password cannot be the same as your current password." });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    // Invalidate existing sessions by updating lastLogout
+    user.lastLogout = new Date();
+    await user.save();
+
+    res.json({ message: "Password reset successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

@@ -1,13 +1,4 @@
-/**
- * PDF Generation Service
- * Uses pdfkit to generate:
- *   - Employee payslips
- *   - Attendance reports
- *   - Performance/analytics reports
- *
- * Every function returns a Promise<Buffer> so controllers can
- * pipe or send the bytes directly.
- */
+
 
 import PDFDocument from "pdfkit";
 
@@ -72,13 +63,7 @@ function footerLine(doc) {
 
 // ── Payslip PDF ───────────────────────────────────────────────────────────────
 
-/**
- * Generate a payslip PDF for one payroll record.
- *
- * @param {Object} payroll   Payroll document (populated with employee)
- * @param {Object} employee  Employee document (populated with userId)
- * @returns {Promise<Buffer>}
- */
+
 export async function generatePayslipPDF(payroll, employee) {
   const doc    = createDoc();
   const finish = bufferFromDoc(doc);
@@ -153,14 +138,7 @@ export async function generatePayslipPDF(payroll, employee) {
 
 // ── Attendance Report PDF ─────────────────────────────────────────────────────
 
-/**
- * Generate an attendance report PDF.
- *
- * @param {Object[]} records   Attendance documents (plain objects)
- * @param {Object}   summary   { employeeId, period, presentDays, completedDays, totalHoursWorked, avgHoursPerDay }
- * @param {string}   empName   Employee display name
- * @returns {Promise<Buffer>}
- */
+
 export async function generateAttendanceReportPDF(records, summary, empName = "Employee") {
   const doc    = createDoc();
   const finish = bufferFromDoc(doc);

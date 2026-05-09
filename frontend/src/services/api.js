@@ -51,6 +51,10 @@ export const authApi = {
     request("/auth/register", { method: "POST", body: JSON.stringify(payload) }),
   logout: () => request("/auth/logout", { method: "POST" }),
   getMe: () => request("/auth/me"),
+  checkEmail: (email) =>
+    request("/auth/check-email", { method: "POST", body: JSON.stringify({ email }) }),
+  resetPassword: (email, newPassword) =>
+    request("/auth/reset-password", { method: "POST", body: JSON.stringify({ email, newPassword }) }),
 };
 
 // ── Attendance ────────────────────────────────────────────────────────────────
@@ -217,6 +221,13 @@ export const roleApi = {
   getAll: () => request("/roles"),
   create: (payload) =>
     request("/roles", { method: "POST", body: JSON.stringify(payload) }),
+};
+
+// ── Notifications ───────────────────────────────────────────────────────────────
+export const notificationsApi = {
+  getNotifications: () => request("/notifications"),
+  markAsRead: (id) => request(`/notifications/${id}/read`, { method: "PUT" }),
+  markAllRead: () => request("/notifications/read-all", { method: "PUT" }),
 };
 
 // ── Analytics ─────────────────────────────────────────────────────────────────

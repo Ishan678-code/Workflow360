@@ -30,7 +30,7 @@ function urgencyScore(task) {
 
   const daysLeft = (new Date(task.deadline) - new Date()) / (1000 * 60 * 60 * 24);
 
-  if (daysLeft < 0)   return 100;  // overdue
+  if (daysLeft < 0)   return 100;  
   if (daysLeft <= 1)  return 95;
   if (daysLeft <= 3)  return 80;
   if (daysLeft <= 7)  return 60;
@@ -78,14 +78,7 @@ function classifyQuadrant(uScore, iScore) {
   return                           { quadrant: "Q4", label: "Eliminate", description: "Not urgent and not important — consider dropping" };
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
 
-/**
- * Score a single task.
- *
- * @param {Object} task  Mongoose Task document (plain object or toObject())
- * @returns {Object}     { aiPriorityScore, scoreBreakdown, eisenhower }
- */
 export function scoreTask(task) {
   const uScore = urgencyScore(task);
   const iScore = importanceScore(task);
@@ -111,14 +104,7 @@ export function scoreTask(task) {
   };
 }
 
-/**
- * Score and rank an array of tasks (highest priority first).
- * Filters out COMPLETED tasks unless includeCompleted = true.
- *
- * @param {Object[]} tasks
- * @param {Object}   options  { includeCompleted: false }
- * @returns {Object[]}        tasks enriched with scoring fields, sorted
- */
+
 export function prioritizeTasks(tasks, { includeCompleted = false } = {}) {
   const filtered = includeCompleted
     ? tasks
@@ -132,12 +118,7 @@ export function prioritizeTasks(tasks, { includeCompleted = false } = {}) {
     .sort((a, b) => b.aiPriorityScore - a.aiPriorityScore);
 }
 
-/**
- * Build a summary of quadrant distribution for a set of tasks.
- *
- * @param {Object[]} scoredTasks  Output of prioritizeTasks()
- * @returns {Object}
- */
+
 export function quadrantSummary(scoredTasks) {
   const counts = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
   scoredTasks.forEach(t => {

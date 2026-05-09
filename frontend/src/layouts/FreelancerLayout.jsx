@@ -8,10 +8,10 @@ import {
   Receipt,
   Menu,
   X,
-  Bell,
   ChevronRight,
   LogOut,
 } from "lucide-react";
+import Notifications from "../components/Notifications";
 import { authApi } from "../services/api";
 import { getInitials } from "../utils/formatters";
 
@@ -32,20 +32,22 @@ export default function FreelancerLayout({ children }) {
   const handleLogout = async () => {
     try {
       await authApi.logout();
-    } catch {}
+    } catch {
+      // Continue with local logout even if the server request fails.
+    }
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     navigate("/");
   };
 
   return (
-    <div className="min-h-screen bg-[#FFFCF7] flex flex-col font-sans selection:bg-amber-600 selection:text-white">
+    <div className="min-h-screen bg-(--bg) text-(--text) flex flex-col font-sans selection:bg-amber-600 selection:text-white">
       <div
         className="fixed inset-0 pointer-events-none opacity-[0.035] z-0"
         style={{ backgroundImage: "radial-gradient(#d97706 1px, transparent 1px)", backgroundSize: "24px 24px" }}
       />
 
-      <header className="bg-white/70 backdrop-blur-xl border-b border-amber-100 sticky top-0 z-50">
+      <header className="bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl border-b border-amber-100 dark:border-amber-900/30 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex-1 flex items-center">
             <div className="flex items-center gap-3">
@@ -59,7 +61,7 @@ export default function FreelancerLayout({ children }) {
             </div>
           </div>
 
-          <nav className="hidden lg:flex items-center bg-amber-50/80 p-1 rounded-2xl border border-amber-100">
+          <nav className="hidden lg:flex items-center bg-amber-50/80 dark:bg-slate-900/50 p-1 rounded-2xl border border-amber-100 dark:border-amber-900/30">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -81,29 +83,26 @@ export default function FreelancerLayout({ children }) {
           </nav>
 
           <div className="flex-1 flex items-center justify-end gap-3 sm:gap-4">
-            <button className="p-2 text-slate-400 hover:text-amber-600 transition-colors relative">
-              <Bell size={19} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
-            </button>
+            <Notifications />
 
-            <div className="flex items-center gap-3 pl-4 border-l border-amber-100">
-              <div className="flex-col items-end hidden md:flex">
-                <span className="text-[13px] font-black text-slate-800 leading-none">{user.name || "Freelancer"}</span>
-                <span className="text-[10px] font-bold text-slate-400 uppercase mt-1">Freelancer</span>
+            <div className="flex items-center gap-3 pl-4 border-l border-amber-100 dark:border-amber-900/30">
+              <div className="hidden md:flex flex-col items-end">
+                <span className="text-[13px] font-black text-slate-800 dark:text-slate-100 leading-none">{user.name || "Freelancer"}</span>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase mt-1">Freelancer</span>
               </div>
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-50 to-orange-100 border border-amber-200 flex items-center justify-center font-black text-amber-700 text-xs shadow-sm">
+              <div className="w-10 h-10 rounded-2xl bg-linear-to-tr from-amber-50 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 border border-amber-200 dark:border-amber-900/30 flex items-center justify-center font-black text-amber-700 dark:text-amber-300 text-xs shadow-sm">
                 {initials}
               </div>
               <button
                 onClick={handleLogout}
-                className="hidden md:flex p-2 text-slate-400 hover:text-rose-500 transition-colors"
+                className="hidden md:flex p-2 text-slate-400 hover:text-rose-500 dark:text-slate-400 dark:hover:text-rose-400 transition-colors"
                 title="Logout"
               >
                 <LogOut size={18} />
               </button>
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="lg:hidden p-2 text-slate-600 bg-amber-50 rounded-lg ml-2"
+                className="lg:hidden p-2 text-slate-600 dark:text-slate-400 bg-amber-50 dark:bg-slate-900 rounded-lg ml-2"
               >
                 {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
               </button>
@@ -113,11 +112,11 @@ export default function FreelancerLayout({ children }) {
       </header>
 
       {isMobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-[60]">
+        <div className="lg:hidden fixed inset-0 z-60">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
-          <aside className="absolute top-0 right-0 h-full w-72 bg-white shadow-2xl p-6">
+          <aside className="absolute top-0 right-0 h-full w-72 bg-white dark:bg-slate-950 shadow-2xl p-6">
             <div className="flex justify-between items-center mb-10">
-              <span className="font-black text-slate-900">Navigation</span>
+              <span className="font-black text-slate-900 dark:text-slate-100">Navigation</span>
               <button onClick={() => setIsMobileMenuOpen(false)}><X size={20} /></button>
             </div>
             <nav className="flex flex-col gap-2">
@@ -128,7 +127,7 @@ export default function FreelancerLayout({ children }) {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={({ isActive }) =>
                     `flex items-center justify-between px-4 py-3 rounded-xl text-[14px] font-bold transition-all ${
-                      isActive ? "bg-amber-600 text-white shadow-lg shadow-amber-200" : "text-slate-500 hover:bg-slate-50"
+                      isActive ? "bg-amber-600 dark:bg-amber-700 text-white shadow-lg shadow-amber-200 dark:shadow-amber-900/40" : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900"
                     }`
                   }
                 >
@@ -142,7 +141,7 @@ export default function FreelancerLayout({ children }) {
             </nav>
             <button
               onClick={handleLogout}
-              className="mt-8 w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[14px] font-bold text-rose-500 hover:bg-rose-50 transition-all"
+              className="mt-8 w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[14px] font-bold text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-900 transition-all"
             >
               <LogOut size={18} /> Logout
             </button>

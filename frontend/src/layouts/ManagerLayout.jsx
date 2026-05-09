@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -8,10 +8,10 @@ import {
   DollarSign,
   Menu,
   X,
-  Bell,
   ChevronRight,
   LogOut,
 } from "lucide-react";
+import Notifications from "../components/Notifications";
 import { authApi } from "../services/api";
 
 const navItems = [
@@ -32,14 +32,18 @@ export default function ManagerLayout({ children }) {
     : "MG";
 
   const handleLogout = async () => {
-    try { await authApi.logout(); } catch {}
+    try {
+      await authApi.logout();
+    } catch {
+      // Continue with local logout even if the server request fails.
+    }
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     navigate("/");
   };
 
   return (
-    <div className="min-h-screen bg-[#FDFDFF] flex flex-col font-sans selection:bg-violet-600 selection:text-white">
+    <div className="min-h-screen bg-(--bg) text-(--text) flex flex-col font-sans selection:bg-violet-600 selection:text-white">
 
       {/* Background Decoration */}
       <div
@@ -48,7 +52,7 @@ export default function ManagerLayout({ children }) {
       />
 
       {/* Header */}
-      <header className="bg-white/70 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-50">
+      <header className="bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-700/60 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
 
           <div className="flex-1 flex items-center">
@@ -63,7 +67,7 @@ export default function ManagerLayout({ children }) {
             </div>
           </div>
 
-          <nav className="hidden lg:flex items-center bg-slate-100/50 p-1 rounded-2xl border border-slate-200/50">
+          <nav className="hidden lg:flex items-center bg-slate-100/50 dark:bg-slate-900/50 p-1 rounded-2xl border border-slate-200/50 dark:border-slate-700/50">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -87,17 +91,14 @@ export default function ManagerLayout({ children }) {
           </nav>
 
           <div className="flex-1 flex items-center justify-end gap-3 sm:gap-4">
-            <button className="p-2 text-slate-400 hover:text-violet-600 transition-colors relative">
-              <Bell size={19} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
-            </button>
+            <Notifications />
 
-            <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
-              <div className="flex-col items-end hidden md:flex">
-                <span className="text-[13px] font-black text-slate-800 leading-none">{user.name || "Manager"}</span>
-                <span className="text-[10px] font-bold text-slate-400 uppercase mt-1">Manager</span>
+            <div className="flex items-center gap-3 pl-4 border-l border-slate-200 dark:border-slate-700">
+              <div className="hidden md:flex flex-col items-end">
+                <span className="text-[13px] font-black text-slate-800 dark:text-slate-100 leading-none">{user.name || "Manager"}</span>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase mt-1">Manager</span>
               </div>
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-100 to-purple-200 border border-violet-200 flex items-center justify-center font-black text-violet-700 text-xs shadow-sm cursor-pointer hover:border-violet-400 transition-colors">
+              <div className="w-10 h-10 rounded-2xl bg-linear-to-tr from-violet-100 to-purple-200 dark:from-violet-900/30 dark:to-purple-900/30 border border-violet-200 dark:border-violet-900/30 flex items-center justify-center font-black text-violet-700 dark:text-violet-300 text-xs shadow-sm cursor-pointer hover:border-violet-400 transition-colors">
                 {initials}
               </div>
               <button
@@ -120,11 +121,11 @@ export default function ManagerLayout({ children }) {
 
       {/* Mobile Sidebar */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-[60]">
+        <div className="lg:hidden fixed inset-0 z-60">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
-          <aside className="absolute top-0 right-0 h-full w-72 bg-white shadow-2xl p-6 animate-in slide-in-from-right duration-300">
+          <aside className="absolute top-0 right-0 h-full w-72 bg-white dark:bg-slate-950 shadow-2xl p-6 animate-in slide-in-from-right duration-300">
             <div className="flex justify-between items-center mb-10">
-              <span className="font-black text-slate-900">Navigation</span>
+              <span className="font-black text-slate-900 dark:text-slate-100">Navigation</span>
               <button onClick={() => setIsMobileMenuOpen(false)}><X size={20} /></button>
             </div>
             <nav className="flex flex-col gap-2">
@@ -135,7 +136,7 @@ export default function ManagerLayout({ children }) {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={({ isActive }) =>
                     `flex items-center justify-between px-4 py-3 rounded-xl text-[14px] font-bold transition-all
-                    ${isActive ? "bg-violet-600 text-white shadow-lg shadow-violet-200" : "text-slate-500 hover:bg-slate-50"}`
+                    ${isActive ? "bg-violet-600 dark:bg-violet-700 text-white shadow-lg shadow-violet-200 dark:shadow-violet-900/40" : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900"}`
                   }
                 >
                   <div className="flex items-center gap-3">

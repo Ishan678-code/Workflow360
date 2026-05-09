@@ -87,13 +87,7 @@ This project demonstrates practical skills in building a complete web applicatio
 - The frontend uses React Router for role-based routing and protected pages.
 - The project is structured to keep controllers, routes, and models separate for easier maintenance and scaling.
 
-## How to use it as a final-year project
 
-- Explain the problem domain clearly: workforce management and how manual processes are inefficient.
-- Highlight the implementation details: why React/Vite, Express, MongoDB.
-- Show the user roles and capabilities in a demo.
-- Point out the modular architecture and how it supports future features.
-- Mention the practical benefits: reduces paperwork, centralizes approvals, tracks freelancer work, and improves payroll accuracy.
 
 ## Future enhancements
 

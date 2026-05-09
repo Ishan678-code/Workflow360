@@ -89,10 +89,3 @@ This project demonstrates practical skills in building a complete web applicatio
 
 
 
-## Future enhancements
-
-- Add API tests and end-to-end UI tests
-- Add deployment scripts and production configuration
-- Improve documentation and user onboarding
-- Add real-time notifications or collaboration features
-- Include analytics dashboards and reporting exports

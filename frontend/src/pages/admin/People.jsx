@@ -153,23 +153,6 @@ const defaultDepartmentOptions = [
   { _id: "default-support", name: "IT Support Department" },
 ];
 
-const roleOptions = [
-  "Backend Developer",
-  "Frontend Developer",
-  "Full Stack Developer",
-  "Mobile Developer",
-  "UI/UX Designer",
-  "QA Engineer",
-  "DevOps Engineer",
-  "HR Executive",
-  "Product Manager",
-  "Project Manager",
-  "Business Analyst",
-  "Finance Executive",
-  "Operations Executive",
-  "Support Engineer",
-];
-
 function readStatusOverrides() {
   try {
     const stored = localStorage.getItem(PEOPLE_STATUS_OVERRIDES_KEY);
@@ -332,37 +315,6 @@ export default function AdminPeople() {
       location: department.location || "Kathmandu HQ",
     };
   });
-
-  async function refreshPeople() {
-    const [employeeRes, freelancerRes, departmentRes] = await Promise.allSettled([
-      employeeApi.getAll(),
-      freelancerApi.getAll(),
-      departmentApi.getAll(),
-    ]);
-
-    const employeeList =
-      employeeRes.status === "fulfilled"
-        ? Array.isArray(employeeRes.value)
-          ? employeeRes.value
-          : employeeRes.value?.data || []
-        : [];
-    const freelancerList =
-      freelancerRes.status === "fulfilled"
-        ? Array.isArray(freelancerRes.value)
-          ? freelancerRes.value
-          : freelancerRes.value?.data || []
-        : [];
-    const departmentList =
-      departmentRes.status === "fulfilled"
-        ? Array.isArray(departmentRes.value)
-          ? departmentRes.value
-          : departmentRes.value?.data || []
-        : [];
-
-    setEmployees(employeeRes.status === "rejected" ? sampleEmployees : employeeList.map(normalizeEmployee));
-    setFreelancers(freelancerRes.status === "rejected" ? sampleFreelancers : freelancerList.map(normalizeFreelancer));
-    setDepartments(departmentList);
-  }
 
   function handleEmployeeSelection(employeeId) {
     const employee = employees.find((person) => person._id === employeeId);

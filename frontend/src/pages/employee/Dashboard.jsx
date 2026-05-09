@@ -13,11 +13,11 @@ import {
   ShieldCheck
 } from "lucide-react";
 
-const StatCard = ({ label, value, sub, icon: Icon, color }) => (
+const StatCard = ({ label, value, sub, icon, color }) => (
   <div className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md">
     <div className="mb-4 flex items-start justify-between">
       <div className={`rounded-xl p-3 ${color} bg-opacity-10 transition-transform group-hover:scale-110 group-hover:rotate-3`}>
-        <Icon size={22} className={color.replace("bg-", "text-")} />
+        {icon({ size: 22, className: color.replace("bg-", "text-") })}
       </div>
       <div className="flex items-center gap-1 text-slate-300 transition-colors group-hover:text-blue-500">
         <span className="text-[10px] font-bold uppercase tracking-tighter">View Details</span>

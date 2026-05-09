@@ -26,6 +26,14 @@ const UserSchema=new mongoose.Schema({
     lastLogout:{
         type:Date,
         default:null
+    },
+    passwordResetToken:{
+        type:String,
+        default:null
+    },
+    passwordResetExpires:{
+        type:Date,
+        default:null
     }
 },{timestamps:true});
 

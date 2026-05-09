@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import FreelancerLayout from "../../layouts/FreelancerLayout";
 import { taskApi, analyticsApi } from "../../services/api";
-import { formatDate, downloadBlob } from "../../utils/formatters";
+import { downloadBlob } from "../../utils/formatters";
 import { Download } from "lucide-react";
 
 const fallbackTasks = [

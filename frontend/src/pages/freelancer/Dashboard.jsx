@@ -61,7 +61,7 @@ export default function FreelancerDashboard() {
         </section>
 
         <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          {cards.map(({ label, value, icon: Icon, tone }) => (
+          {cards.map(({ label, value, icon, tone }) => (
             <article key={label} className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -69,7 +69,7 @@ export default function FreelancerDashboard() {
                   <p className="mt-3 text-3xl font-black tracking-tight text-slate-900">{value}</p>
                 </div>
                 <div className={`rounded-2xl p-3 ${tone}`}>
-                  <Icon size={22} />
+                  {icon({ size: 22 })}
                 </div>
               </div>
             </article>

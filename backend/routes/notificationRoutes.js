@@ -1,6 +1,7 @@
 import express from "express";
 import { verifyToken } from "../middleware/auth.js";
 import {
+  broadcastNotification,
   createNotification,
   getNotifications,
   markAllRead,
@@ -12,6 +13,7 @@ const router = express.Router();
 router.use(verifyToken);
 router.get("/", getNotifications);
 router.post("/", createNotification);
+router.post("/broadcast", broadcastNotification);
 router.put("/read-all", markAllRead);
 router.put("/:id/read", markAsRead);
 

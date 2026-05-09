@@ -11,11 +11,11 @@ import { payrollApi } from "../../services/api";
 import { downloadBlob, formatCurrency, formatMonthLabel } from "../../utils/formatters";
 
 // ── Summary Card Component ──────────────────────────────────────────────────
-const SummaryCard = ({ label, amount, icon: Icon, color, bg }) => (
+const SummaryCard = ({ label, amount, icon, color, bg }) => (
   <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex flex-col justify-between h-32">
     <div className="flex justify-between items-start">
       <div className={`p-2.5 rounded-xl ${bg} ${color}`}>
-        <Icon size={20} />
+        {icon({ size: 20 })}
       </div>
       <TrendingUp size={16} className="text-slate-300" />
     </div>

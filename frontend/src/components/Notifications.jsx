@@ -14,21 +14,17 @@ function getStoredUser() {
 }
 
 export default function Notifications() {
-  const user = useMemo(getStoredUser, []);
+  const user = useMemo(() => getStoredUser(), []);
+  const hasUser = Boolean(user?.id);
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(hasUser);
   const socketRef = useRef(null);
 
   useEffect(() => {
-    if (!user?.id) {
-      setNotifications([]);
-      setLoading(false);
-      return;
-    }
+    if (!hasUser) return;
 
     let canceled = false;
-    setLoading(true);
 
     notificationsApi
       .getNotifications()
@@ -47,10 +43,10 @@ export default function Notifications() {
     return () => {
       canceled = true;
     };
-  }, [user]);
+  }, [hasUser]);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!hasUser) return;
 
     const socket = io(BACKEND_URL, {
       path: "/socket.io",
@@ -71,7 +67,7 @@ export default function Notifications() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [user]);
+  }, [hasUser, user?.id]);
 
   const unreadCount = notifications.filter((item) => !item.isRead).length;
 

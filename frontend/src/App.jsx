@@ -6,6 +6,7 @@ import NotFound        from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminPeople from "./pages/admin/People";
+import AdminNotifications from "./pages/admin/Notifications";
 import AdminPerformance from "./pages/admin/Performance";
 import AdminPayroll from "./pages/admin/Payroll";
 import AdminProjects from "./pages/admin/Projects";
@@ -36,6 +37,7 @@ export default function App() {
         <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
           <Route path="/admin/dashboard"       element={<AdminDashboard />} />
           <Route path="/admin/people"          element={<AdminPeople />} />
+          <Route path="/admin/notifications"   element={<AdminNotifications />} />
           <Route path="/admin/performance"     element={<AdminPerformance />} />
           <Route path="/admin/payroll"         element={<AdminPayroll />} />
           <Route path="/admin/projects"        element={<AdminProjects />} />

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
+  Bell,
   Briefcase,
   ChevronRight,
   LayoutDashboard,
@@ -18,6 +19,7 @@ import { getInitials } from "../utils/formatters";
 const navItems = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/people", label: "People", icon: Users },
+  { to: "/admin/notifications", label: "Notifications", icon: Bell },
   { to: "/admin/performance", label: "Performance", icon: Shield },
   { to: "/admin/payroll", label: "Payroll", icon: Receipt },
   { to: "/admin/projects", label: "Projects", icon: Briefcase },
@@ -61,7 +63,7 @@ export default function AdminLayout({ children }) {
             </div>
           </div>
 
-          <nav className="hidden items-center rounded-2xl border border-rose-100 dark:border-rose-900/30 bg-rose-50/80 dark:bg-slate-900/50 p-1 lg:flex">
+          <nav className="flex items-center gap-2 rounded-2xl border border-rose-100 dark:border-rose-900/30 bg-rose-50/80 dark:bg-slate-900/50 p-1 overflow-x-auto">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -71,7 +73,8 @@ export default function AdminLayout({ children }) {
                     isActive ? "bg-white dark:bg-slate-700/80 text-rose-700 dark:text-rose-300 shadow-sm ring-1 ring-rose-100 dark:ring-rose-900/30" : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                   }`
                 }
-              >                {({ isActive }) => (
+              >
+                {({ isActive }) => (
                   <>
                     <item.icon size={16} strokeWidth={isActive ? 2.5 : 2} />
                     <span className="whitespace-nowrap">{item.label}</span>
@@ -101,7 +104,7 @@ export default function AdminLayout({ children }) {
               </button>
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="ml-2 rounded-lg bg-rose-50 dark:bg-slate-900 p-2 text-slate-600 dark:text-slate-400 lg:hidden"
+                className="ml-2 rounded-lg bg-rose-50 dark:bg-slate-900 p-2 text-slate-600 dark:text-slate-400 md:hidden"
               >
                 {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
               </button>
@@ -111,7 +114,7 @@ export default function AdminLayout({ children }) {
       </header>
 
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-60 lg:hidden">
+        <div className="fixed inset-0 z-60 md:hidden">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
           <aside className="absolute right-0 top-0 h-full w-72 bg-white dark:bg-slate-950 p-6 shadow-2xl">
             <div className="mb-10 flex items-center justify-between">

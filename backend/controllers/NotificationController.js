@@ -1,4 +1,5 @@
 import Notification from "../models/Notification.js";
+import User from "../models/User.js";
 
 export const getNotifications = async (req, res) => {
   try {
@@ -41,6 +42,10 @@ export const markAllRead = async (req, res) => {
 
 export const createNotification = async (req, res) => {
   try {
+    if (!["ADMIN", "MANAGER"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Access denied: insufficient permissions" });
+    }
+
     const { userId, title, message, type, metadata } = req.body;
     if (!userId || !title || !message) {
       return res.status(400).json({ message: "userId, title, and message are required" });
@@ -55,6 +60,47 @@ export const createNotification = async (req, res) => {
     });
 
     res.status(201).json(notification);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const broadcastNotification = async (req, res) => {
+  try {
+    if (!["ADMIN", "MANAGER"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Access denied: insufficient permissions" });
+    }
+
+    const { title, message, type, metadata, targetRoles } = req.body;
+    if (!title || !message) {
+      return res.status(400).json({ message: "title and message are required" });
+    }
+
+    // Get all active users, optionally filter by roles
+    const query = { isActive: true };
+    if (targetRoles && Array.isArray(targetRoles)) {
+      query.role = { $in: targetRoles };
+    }
+
+    const users = await User.find(query).select('_id');
+    if (users.length === 0) {
+      return res.status(400).json({ message: "No users found to notify" });
+    }
+
+    const notifications = users.map(user => ({
+      user: user._id,
+      title,
+      message,
+      type: type || "GENERAL",
+      metadata: metadata || {},
+    }));
+
+    const createdNotifications = await Notification.insertMany(notifications);
+
+    res.status(201).json({
+      message: `Notification sent to ${createdNotifications.length} users`,
+      count: createdNotifications.length
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

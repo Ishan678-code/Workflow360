@@ -1,6 +1,7 @@
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 export const register = async (req, res) => {
   try {
@@ -95,7 +96,17 @@ export const checkEmail = async (req, res) => {
     if (!user) return res.status(404).json({ message: "No account found with this email address" });
     if (!user.isActive) return res.status(403).json({ message: "This account has been deactivated. Contact your administrator." });
 
-    res.json({ message: "Email verified" });
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    user.passwordResetToken = await bcrypt.hash(resetToken, 10);
+    user.passwordResetExpires = new Date(Date.now() + 15 * 60 * 1000);
+    await user.save();
+
+    const response = { message: "Email verified" };
+    if (process.env.NODE_ENV !== "production") {
+      response.resetToken = resetToken;
+    }
+
+    res.json(response);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -103,9 +114,9 @@ export const checkEmail = async (req, res) => {
 
 export const resetPassword = async (req, res) => {
   try {
-    const { email, newPassword } = req.body;
-    if (!email || !newPassword) {
-      return res.status(400).json({ message: "Email and new password are required" });
+    const { email, newPassword, resetToken } = req.body;
+    if (!email || !newPassword || !resetToken) {
+      return res.status(400).json({ message: "Email, reset token, and new password are required" });
     }
     if (newPassword.length < 6) {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
@@ -113,6 +124,15 @@ export const resetPassword = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "No account found with this email address" });
+    if (!user.isActive) return res.status(403).json({ message: "This account has been deactivated. Contact your administrator." });
+    if (!user.passwordResetToken || !user.passwordResetExpires || user.passwordResetExpires < new Date()) {
+      return res.status(400).json({ message: "Password reset link has expired. Please request a new one." });
+    }
+
+    const isValidResetToken = await bcrypt.compare(resetToken, user.passwordResetToken);
+    if (!isValidResetToken) {
+      return res.status(400).json({ message: "Invalid password reset token" });
+    }
 
     const isSame = await bcrypt.compare(newPassword, user.password);
     if (isSame) {
@@ -122,6 +142,8 @@ export const resetPassword = async (req, res) => {
     user.password = await bcrypt.hash(newPassword, 10);
     // Invalidate existing sessions by updating lastLogout
     user.lastLogout = new Date();
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
     await user.save();
 
     res.json({ message: "Password reset successfully" });

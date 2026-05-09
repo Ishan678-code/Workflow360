@@ -37,6 +37,7 @@ export default function ForgotPassword() {
   const [showConf, setShowConf]   = useState(false);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState("");
+  const [resetToken, setResetToken] = useState("");
 
   // ── Step 1: verify email ───────────────────────────────────────────────────
   const handleCheckEmail = async (e) => {
@@ -44,7 +45,8 @@ export default function ForgotPassword() {
     setError("");
     setLoading(true);
     try {
-      await authApi.checkEmail(email.trim());
+      const data = await authApi.checkEmail(email.trim());
+      setResetToken(data.resetToken || "");
       setStep(STEPS.RESET);
     } catch (err) {
       setError(err.message || "Could not verify email.");
@@ -61,7 +63,7 @@ export default function ForgotPassword() {
     if (newPw !== confirmPw) { setError("Passwords do not match."); return; }
     setLoading(true);
     try {
-      await authApi.resetPassword(email.trim(), newPw);
+      await authApi.resetPassword(email.trim(), newPw, resetToken);
       setStep(STEPS.DONE);
       setTimeout(() => navigate("/"), 2000);
     } catch (err) {
@@ -236,7 +238,7 @@ export default function ForgotPassword() {
 
                 <button
                   type="button"
-                  onClick={() => { setStep(STEPS.EMAIL); setError(""); setNewPw(""); setConfirmPw(""); }}
+                  onClick={() => { setStep(STEPS.EMAIL); setError(""); setNewPw(""); setConfirmPw(""); setResetToken(""); }}
                   className="mt-4 w-full text-center text-[13px] text-slate-400 hover:text-slate-600 transition-colors"
                 >
                   ← Use a different email

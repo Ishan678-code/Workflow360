@@ -9,21 +9,15 @@ import {
 import ManagerLayout from "../../layouts/ManagerLayout";
 import { analyticsApi } from "../../services/api";
 
-const fallbackStats = [
-  { label: "Team Members", value: "24", icon: Users, tone: "bg-violet-100 text-violet-700" },
-  { label: "Pending Leaves", value: "6", icon: CalendarCheck, tone: "bg-amber-100 text-amber-700" },
-  { label: "Open Tasks", value: "18", icon: Briefcase, tone: "bg-sky-100 text-sky-700" },
-  { label: "Avg. Utilization", value: "91%", icon: TrendingUp, tone: "bg-emerald-100 text-emerald-700" },
-];
-
-const priorities = [
-  "Review leave requests before noon",
-  "Follow up on payroll exceptions",
-  "Check delivery risk for the mobile redesign sprint",
+const defaultStats = [
+  { label: "Team Members", value: "0", icon: <Users size={22} />, tone: "bg-violet-100 text-violet-700" },
+  { label: "Pending Leaves", value: "0", icon: <CalendarCheck size={22} />, tone: "bg-amber-100 text-amber-700" },
+  { label: "Open Tasks", value: "0", icon: <Briefcase size={22} />, tone: "bg-sky-100 text-sky-700" },
+  { label: "Avg. Utilization", value: "0%", icon: <TrendingUp size={22} />, tone: "bg-emerald-100 text-emerald-700" },
 ];
 
 export default function ManagerDashboard() {
-  const [stats, setStats] = useState(fallbackStats);
+  const [stats, setStats] = useState(defaultStats);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -35,10 +29,10 @@ export default function ManagerDashboard() {
         if (!active || !data || typeof data !== "object") return;
 
         setStats([
-          { label: "Team Members", value: String(data.totalEmployees ?? data.employees ?? 24), icon: Users, tone: "bg-violet-100 text-violet-700" },
-          { label: "Pending Leaves", value: String(data.pendingLeaves ?? 6), icon: CalendarCheck, tone: "bg-amber-100 text-amber-700" },
-          { label: "Open Tasks", value: String(data.openTasks ?? data.pendingTasks ?? 18), icon: Briefcase, tone: "bg-sky-100 text-sky-700" },
-          { label: "Avg. Utilization", value: `${Math.round(data.productivity ?? data.utilization ?? 91)}%`, icon: TrendingUp, tone: "bg-emerald-100 text-emerald-700" },
+          { label: "Team Members", value: String(data.totalEmployees ?? data.employees ?? 0), icon: <Users size={22} />, tone: "bg-violet-100 text-violet-700" },
+          { label: "Pending Leaves", value: String(data.pendingLeaves ?? 0), icon: <CalendarCheck size={22} />, tone: "bg-amber-100 text-amber-700" },
+          { label: "Open Tasks", value: String(data.openTasks ?? data.pendingTasks ?? 0), icon: <Briefcase size={22} />, tone: "bg-sky-100 text-sky-700" },
+          { label: "Avg. Utilization", value: `${Math.round(data.productivity ?? data.utilization ?? 0)}%`, icon: <TrendingUp size={22} />, tone: "bg-emerald-100 text-emerald-700" },
         ]);
       } catch (err) {
         if (active) setError(err.message || "Live dashboard data is unavailable.");
@@ -77,12 +71,12 @@ export default function ManagerDashboard() {
 
         {error ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-            {error} Showing fallback metrics for now.
+            {error} Showing available live metrics only.
           </div>
         ) : null}
 
         <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          {stats.map(({ label, value, icon: Icon, tone }) => (
+          {stats.map(({ label, value, icon, tone }) => (
             <article key={label} className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
               <div className="flex items-start justify-between">
                 <div>
@@ -90,7 +84,7 @@ export default function ManagerDashboard() {
                   <p className="mt-3 text-4xl font-black tracking-tight text-slate-900">{value}</p>
                 </div>
                 <div className={`rounded-2xl p-3 ${tone}`}>
-                  <Icon size={22} />
+                  {icon}
                 </div>
               </div>
             </article>
@@ -108,11 +102,11 @@ export default function ManagerDashboard() {
                 On Track
               </span>
             </div>
-            <div className="mt-6 space-y-3">
-              {priorities.map((item) => (
-                <div key={item} className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="h-2.5 w-2.5 rounded-full bg-violet-600" />
-                  <p className="text-sm font-semibold text-slate-700">{item}</p>
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              {stats.slice(1).map((item) => (
+                <div key={item.label} className="rounded-2xl bg-slate-50 px-4 py-4">
+                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">{item.label}</p>
+                  <p className="mt-2 text-2xl font-black text-slate-900">{item.value}</p>
                 </div>
               ))}
             </div>
@@ -122,9 +116,9 @@ export default function ManagerDashboard() {
             <h2 className="text-xl font-black text-slate-900">Approvals Snapshot</h2>
             <div className="mt-6 space-y-4">
               {[
-                ["Leave approvals pending", "6"],
-                ["Timesheets awaiting review", "4"],
-                ["Performance notes due", "3"],
+                ["Leave approvals pending", stats.find((item) => item.label === "Pending Leaves")?.value || "0"],
+                ["Open tasks", stats.find((item) => item.label === "Open Tasks")?.value || "0"],
+                ["Team utilization", stats.find((item) => item.label === "Avg. Utilization")?.value || "0%"],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-2xl border border-slate-100 px-4 py-4">
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{label}</p>

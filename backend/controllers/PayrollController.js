@@ -1,5 +1,6 @@
 import Payroll from "../models/Payroll.js";
 import Employee from "../models/Employee.js";
+import Department from "../models/Department.js";
 import Attendance from "../models/Attendance.js";
 import Leave from "../models/Leave.js";
 import { generatePayslipPDF } from "../services/pdfService.js";
@@ -10,6 +11,25 @@ function getMonthRange(month) {
   const from = new Date(year, mon - 1, 1);
   const to = new Date(year, mon, 0, 23, 59, 59);
   return { from, to, totalDaysInMonth: to.getDate() };
+}
+
+function getCurrentMonthValue() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function validatePayrollMonth(month) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month || "")) {
+    return "month must use YYYY-MM format";
+  }
+
+  if (month > getCurrentMonthValue()) {
+    return "Payroll can only be generated for the current month or completed past months";
+  }
+
+  return "";
 }
 
 function countLeaveDays(leaves, from, to) {
@@ -85,6 +105,11 @@ export const generatePayroll = async (req, res) => {
       return res.status(400).json({ message: "employeeId and month are required" });
     }
 
+    const monthError = validatePayrollMonth(month);
+    if (monthError) {
+      return res.status(400).json({ message: monthError });
+    }
+
     // Prevent duplicate payroll for same employee+month
     const existing = await Payroll.findOne({ employee: employeeId, month });
     if (existing) {
@@ -130,6 +155,11 @@ export const generateBulkPayroll = async (req, res) => {
       return res.status(400).json({ message: "month is required (format: YYYY-MM)" });
     }
 
+    const monthError = validatePayrollMonth(month);
+    if (monthError) {
+      return res.status(400).json({ message: monthError });
+    }
+
     const employees = await Employee.find();
     if (employees.length === 0) {
       return res.json({ message: "No employees found", results: [] });
@@ -173,8 +203,36 @@ export const getAllPayroll = async (req, res) => {
     const { month, employeeId } = req.query;
     const filter = {};
 
-    if (month)      filter.month = month;
-    if (employeeId) filter.employee = employeeId;
+    if (month) filter.month = month;
+
+    if (req.user.role === "MANAGER") {
+      const [managedEmployees, headedDepartments] = await Promise.all([
+        Employee.find({ manager: req.user.id }).select("_id"),
+        Department.find({ head: req.user.id }).select("_id")
+      ]);
+
+      const managedEmployeeIds = managedEmployees.map((employee) => employee._id.toString());
+      const departmentEmployeeIds = headedDepartments.length
+        ? (await Employee.find({ department: { $in: headedDepartments.map((department) => department._id) } }).select("_id"))
+          .map((employee) => employee._id.toString())
+        : [];
+
+      const visibleEmployeeIds = [...new Set([...managedEmployeeIds, ...departmentEmployeeIds])];
+      if (visibleEmployeeIds.length === 0) {
+        return res.json([]);
+      }
+
+      if (employeeId) {
+        if (!visibleEmployeeIds.includes(String(employeeId))) {
+          return res.json([]);
+        }
+        filter.employee = employeeId;
+      } else {
+        filter.employee = { $in: visibleEmployeeIds };
+      }
+    } else if (employeeId) {
+      filter.employee = employeeId;
+    }
 
     const payrolls = await Payroll
       .find(filter)

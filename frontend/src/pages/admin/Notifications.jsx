@@ -11,6 +11,7 @@ export default function AdminNotifications() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -28,17 +29,30 @@ export default function AdminNotifications() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSuccess(false);
+
+    const title = formData.title.trim();
+    const body = formData.message.trim();
+
+    if (!title || !body) {
+      setMessage("Title and message are required.");
+      return;
+    }
+
     setIsSubmitting(true);
     setMessage("");
 
     try {
       const payload = {
         ...formData,
+        title,
+        message: body,
         targetRoles: formData.targetRoles.length > 0 ? formData.targetRoles : undefined, // Send undefined to target all
       };
 
       const response = await notificationsApi.broadcast(payload);
       setMessage(`Notification sent successfully to ${response.count} users!`);
+      setIsSuccess(true);
       setFormData({
         title: "",
         message: "",
@@ -46,7 +60,8 @@ export default function AdminNotifications() {
         targetRoles: [],
       });
     } catch (error) {
-      setMessage(error.response?.data?.message || "Failed to send notification");
+      setMessage(error.message || "Failed to send notification");
+      setIsSuccess(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -58,6 +73,12 @@ export default function AdminNotifications() {
     { value: "EMPLOYEE", label: "Employees" },
     { value: "FREELANCER", label: "Freelancers" },
   ];
+  const audienceLabel = formData.targetRoles.length
+    ? roles
+        .filter((role) => formData.targetRoles.includes(role.value))
+        .map((role) => role.label)
+        .join(", ")
+    : "All active users";
 
   return (
     <AdminLayout>
@@ -123,8 +144,11 @@ export default function AdminNotifications() {
 
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-3">
-                  Target Roles (leave empty to send to all users)
+                  Target Roles
                 </label>
+                <p className="mb-3 text-sm text-slate-500">
+                  Current audience: <span className="font-semibold text-slate-700">{audienceLabel}</span>
+                </p>
                 <div className="flex flex-wrap gap-3">
                   {roles.map(role => (
                     <label key={role.value} className="flex items-center gap-2">
@@ -142,7 +166,7 @@ export default function AdminNotifications() {
 
               {message && (
                 <div className={`rounded-xl p-4 text-sm font-medium ${
-                  message.includes("successfully")
+                  isSuccess
                     ? "border border-green-200 bg-green-50 text-green-800"
                     : "border border-red-200 bg-red-50 text-red-800"
                 }`}>

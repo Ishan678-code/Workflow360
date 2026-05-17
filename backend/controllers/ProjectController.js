@@ -65,14 +65,33 @@ export const createProject = async (req, res) => {
       return res.status(400).json({ message: "name and deadline are required" });
     }
 
+    const effectiveStartDate = startDate ? new Date(startDate) : new Date();
+    const effectiveDeadline = new Date(deadline);
+
+    if (Number.isNaN(effectiveDeadline.getTime()) || Number.isNaN(effectiveStartDate.getTime())) {
+      return res.status(400).json({ message: "startDate and deadline must be valid dates" });
+    }
+
+    if (effectiveDeadline < effectiveStartDate) {
+      return res.status(400).json({ message: "deadline cannot be earlier than startDate" });
+    }
+
+    if (Number(budget || 0) < 0) {
+      return res.status(400).json({ message: "budget cannot be negative" });
+    }
+
+    if (utilizationTarget !== undefined && (Number(utilizationTarget) < 0 || Number(utilizationTarget) > 100)) {
+      return res.status(400).json({ message: "utilizationTarget must be between 0 and 100" });
+    }
+
     const project = await Project.create({
       code,
       name,
       description,
       clientName,
-      budget,
-      startDate,
-      deadline,
+      budget: Number(budget || 0),
+      startDate: effectiveStartDate,
+      deadline: effectiveDeadline,
       freelancers: freelancers || [],
       employees: employees || [],
       manager: ownerManager || req.user.id,

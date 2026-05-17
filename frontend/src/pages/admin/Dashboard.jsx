@@ -22,10 +22,13 @@ const defaultSummary = {
   totalEmployees: 0,
   totalFreelancers: 0,
   totalProjects: 0,
+  totalDepartments: 0,
   activeProjects: 0,
   pendingLeaves: 0,
   pendingTimesheets: 0,
   payrollTotal: 0,
+  taskSummary: { TODO: 0, IN_PROGRESS: 0, COMPLETED: 0 },
+  averageUtilization: 0,
 };
 
 export default function AdminDashboard() {
@@ -66,12 +69,15 @@ export default function AdminDashboard() {
         totalEmployees: dashboard.totalEmployees ?? employeeList.length,
         totalFreelancers: dashboard.totalFreelancers ?? freelancerList.length,
         totalProjects: dashboard.totalProjects ?? projectList.length,
+        totalDepartments: dashboard.totalDepartments ?? 0,
         activeProjects:
           dashboard.activeProjects ??
           projectList.filter((project) => String(project.status || "").toUpperCase() === "ACTIVE").length,
         pendingLeaves: dashboard.pendingLeaves ?? 0,
         pendingTimesheets: dashboard.pendingTimesheets ?? 0,
         payrollTotal: payrollList.reduce((total, item) => total + Number(item.netSalary || item.amount || 0), 0),
+        taskSummary: dashboard.taskSummary || { TODO: 0, IN_PROGRESS: 0, COMPLETED: 0 },
+        averageUtilization: dashboard.averageUtilization ?? 0,
       });
     }
 
@@ -85,10 +91,10 @@ export default function AdminDashboard() {
   }, []);
 
   const statCards = [
-    { label: "Employees", value: summary.totalEmployees, icon: Users, tone: "bg-rose-100 text-rose-700" },
-    { label: "Freelancers", value: summary.totalFreelancers, icon: UserRoundCog, tone: "bg-orange-100 text-orange-700" },
-    { label: "Projects", value: summary.totalProjects, icon: Briefcase, tone: "bg-sky-100 text-sky-700" },
-    { label: "Active Delivery", value: summary.activeProjects, icon: Activity, tone: "bg-emerald-100 text-emerald-700" },
+    { label: "Employees", value: summary.totalEmployees, icon: <Users size={22} />, tone: "bg-rose-100 text-rose-700" },
+    { label: "Freelancers", value: summary.totalFreelancers, icon: <UserRoundCog size={22} />, tone: "bg-orange-100 text-orange-700" },
+    { label: "Projects", value: summary.totalProjects, icon: <Briefcase size={22} />, tone: "bg-sky-100 text-sky-700" },
+    { label: "Active Delivery", value: summary.activeProjects, icon: <Activity size={22} />, tone: "bg-emerald-100 text-emerald-700" },
   ];
 
   const operationalCards = [
@@ -97,25 +103,66 @@ export default function AdminDashboard() {
     { label: "Payroll Exposure", value: formatCurrency(summary.payrollTotal) },
   ];
 
+  const taskSummaryStats = [
+    { label: "To Do", value: summary.taskSummary.TODO, tone: "bg-rose-500" },
+    { label: "In Progress", value: summary.taskSummary.IN_PROGRESS, tone: "bg-amber-500" },
+    { label: "Completed", value: summary.taskSummary.COMPLETED, tone: "bg-emerald-500" },
+  ];
+  const taskTotal = taskSummaryStats.reduce((total, item) => total + item.value, 0) || 1;
+
   return (
     <AdminLayout>
       <div className="space-y-8">
-        <section className="overflow-hidden rounded-[34px] border border-rose-100 bg-gradient-to-br from-rose-700 via-rose-600 to-orange-500 px-8 py-10 text-white shadow-2xl">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div>
+        <section className="overflow-hidden rounded-[34px] border border-rose-100 bg-linear-to-br from-rose-700 via-rose-600 to-orange-500 px-8 py-10 text-white shadow-2xl">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex-1">
               <p className="text-xs font-black uppercase tracking-[0.32em] text-rose-100">Executive Overview</p>
               <h1 className="mt-3 text-4xl font-black tracking-tight">Admin command center for the whole operation.</h1>
               <p className="mt-3 max-w-2xl text-sm text-rose-50/90">
                 Monitor headcount, throughput, approvals, and payroll from one place without dropping into each role portal.
               </p>
-            </div>
-            <div className="rounded-3xl border border-white/15 bg-white/10 px-5 py-4 backdrop-blur">
-              <div className="flex items-center gap-3">
-                <ShieldCheck size={18} className="text-rose-100" />
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-rose-100">System Status</p>
-                  <p className="text-lg font-black">Admin Access Active</p>
+              <div className="mt-8 rounded-[28px] border border-white/15 bg-white/10 p-5 backdrop-blur">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-[0.18em] text-rose-100">Task flow</p>
+                    <p className="mt-1 text-xl font-black text-white">Live status across active workstreams</p>
+                  </div>
+                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-rose-50">
+                    Utilization {summary.averageUtilization.toFixed(0)}%
+                  </span>
                 </div>
+                <div className="mt-6 space-y-4">
+                  {taskSummaryStats.map((stat) => (
+                    <div key={stat.label}>
+                      <div className="flex items-center justify-between text-sm text-rose-50/90">
+                        <span>{stat.label}</span>
+                        <span className="font-black">{stat.value}</span>
+                      </div>
+                      <div className="mt-2 h-3 overflow-hidden rounded-full bg-rose-100/20">
+                        <div
+                          className={`${stat.tone} h-full rounded-full transition-all duration-300`}
+                          style={{ width: `${Math.round((stat.value / taskTotal) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="grid w-full max-w-sm gap-4">
+              <div className="rounded-3xl border border-white/15 bg-white/10 px-5 py-4 backdrop-blur">
+                <div className="flex items-center gap-3">
+                  <ShieldCheck size={18} className="text-rose-100" />
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-rose-100">System Status</p>
+                    <p className="text-lg font-black">Admin Access Active</p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-3xl border border-white/15 bg-white/10 px-5 py-4 backdrop-blur">
+                <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-rose-100">Departments</p>
+                <p className="mt-3 text-3xl font-black text-white">{summary.totalDepartments}</p>
+                <p className="mt-2 text-sm text-rose-50/80">Active departments and team alignment.</p>
               </div>
             </div>
           </div>
@@ -128,7 +175,7 @@ export default function AdminDashboard() {
         ) : null}
 
         <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          {statCards.map(({ label, value, icon: Icon, tone }) => (
+          {statCards.map(({ label, value, icon, tone }) => (
             <article key={label} className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -136,7 +183,7 @@ export default function AdminDashboard() {
                   <p className="mt-3 text-4xl font-black tracking-tight text-slate-900">{value}</p>
                 </div>
                 <div className={`rounded-2xl p-3 ${tone}`}>
-                  <Icon size={22} />
+                  {icon}
                 </div>
               </div>
             </article>

@@ -43,6 +43,16 @@ export default function AdminPerformance() {
 
   const topEmployees = report?.topEmployeesByCompletedTasks || [];
   const topFreelancers = report?.topFreelancersByHoursLogged || [];
+  const algorithm = report?.algorithm || null;
+  const averageReviewScore = reviews.length
+    ? reviews.reduce((sum, review) => sum + Number(review.score ?? review.rating ?? 0), 0) / reviews.length
+    : null;
+
+  const summaryCards = [
+    { label: "Employees Tracked", value: String(topEmployees.length) },
+    { label: "Freelancers Tracked", value: String(topFreelancers.length) },
+    { label: "Average Review", value: averageReviewScore !== null ? `${averageReviewScore.toFixed(1)}/5` : "—" },
+  ];
 
   return (
     <AdminLayout>
@@ -58,6 +68,15 @@ export default function AdminPerformance() {
           </div>
         ) : null}
 
+        <div className="grid gap-6 lg:grid-cols-3">
+          {summaryCards.map((card) => (
+            <article key={card.label} className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">{card.label}</p>
+              <p className="mt-3 text-4xl font-black tracking-tight text-slate-900">{card.value}</p>
+            </article>
+          ))}
+        </div>
+
         <div className="grid gap-6 xl:grid-cols-2">
           <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-black text-slate-900">Top Employees by Completed Tasks</h2>
@@ -65,7 +84,10 @@ export default function AdminPerformance() {
               {topEmployees.length ? (
                 topEmployees.map((entry, index) => (
                   <div key={`${entry._id}-${index}`} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-4">
-                    <span className="font-semibold text-slate-700">{entry.name || entry.user?.name || "Unknown User"}</span>
+                    <div>
+                      <p className="font-semibold text-slate-700">{entry.name || entry.user?.name || "Unknown User"}</p>
+                      <p className="text-xs text-slate-400">{entry.email || entry.user?.email || ""}</p>
+                    </div>
                     <span className="font-black text-rose-700">{entry.completedTasks}</span>
                   </div>
                 ))
@@ -83,7 +105,10 @@ export default function AdminPerformance() {
               {topFreelancers.length ? (
                 topFreelancers.map((entry, index) => (
                   <div key={`${entry._id}-${index}`} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-4">
-                    <span className="font-semibold text-slate-700">{entry.name || entry.user?.name || "Unknown Freelancer"}</span>
+                    <div>
+                      <p className="font-semibold text-slate-700">{entry.name || entry.user?.name || "Unknown Freelancer"}</p>
+                      <p className="text-xs text-slate-400">{entry.email || entry.user?.email || ""}</p>
+                    </div>
                     <span className="font-black text-rose-700">{entry.totalHours}</span>
                   </div>
                 ))
@@ -94,7 +119,17 @@ export default function AdminPerformance() {
               )}
             </div>
           </section>
+
         </div>
+
+        {algorithm ? (
+          <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-black text-slate-900">Scoring Method</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              {algorithm.performanceScoreFormula || algorithm.formula || "Task completion, quality, and deadline adherence are combined into a management score."}
+            </p>
+          </section>
+        ) : null}
 
         <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-black text-slate-900">Recent Reviews</h2>

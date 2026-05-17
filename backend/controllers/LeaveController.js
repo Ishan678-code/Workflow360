@@ -36,6 +36,10 @@ export const applyLeave = async (req, res) => {
       return res.status(400).json({ message: "type, from, and to are required" });
     }
 
+    if (!String(reason || "").trim()) {
+      return res.status(400).json({ message: "reason is required" });
+    }
+
     const normalizedType = String(type).toUpperCase();
     const policy = LEAVE_LIMITS[normalizedType];
     if (!policy) {
@@ -70,13 +74,23 @@ export const applyLeave = async (req, res) => {
       });
     }
 
+    const overlappingLeave = await Leave.findOne({
+      employee: employeeProfile._id,
+      status: { $in: ["PENDING", "APPROVED"] },
+      from: { $lte: toDate },
+      to: { $gte: fromDate }
+    });
+    if (overlappingLeave) {
+      return res.status(400).json({ message: "A pending or approved leave already overlaps this date range" });
+    }
+
     const leave = await Leave.create({
       employee: employeeProfile._id,
       type: normalizedType,
       from: fromDate,
       to: toDate,
       totalDays,
-      reason,
+      reason: String(reason).trim(),
       status: "PENDING",
       approvalDepartment: employeeProfile.department?._id
     });

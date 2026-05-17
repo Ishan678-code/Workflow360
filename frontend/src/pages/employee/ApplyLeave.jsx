@@ -32,14 +32,6 @@ const SendIcon = () => (
   </svg>
 );
 
-// ── Sample history data ───────────────────────────────────────────────────────
-const sampleHistory = [
-  { type: "Annual",        period: "Mar 15, 2026 – Mar 18, 2026", reason: "Family vacation",     link: false },
-  { type: "Sick",          period: "Mar 5, 2026",                  reason: "Medical appointment", link: true  },
-  { type: "Annual",        period: "Feb 14, 2026",                 reason: "Personal day",        link: false },
-  { type: "Compassionate", period: "Jan 20, 2026 – Jan 22, 2026",  reason: "Family emergency",    link: true  },
-];
-
 const statusMeta = {
   APPROVED : "bg-green-50 text-green-600 border-green-100",
   REJECTED : "bg-red-50 text-red-600 border-red-100",
@@ -108,8 +100,7 @@ export default function ApplyLeave() {
           link: false,
         })));
       } catch {
-        // API unreachable — fall back to sample so page isn't empty
-        if (active) setHistory(sampleHistory);
+        if (active) setError("Unable to load leave history.");
       } finally {
         if (active) setHistoryLoaded(true);
       }
@@ -143,11 +134,16 @@ export default function ApplyLeave() {
       setError("End date cannot be before start date.");
       return;
     }
+    if (!form.reason.trim()) {
+      setError("Reason is required for audit and manager review.");
+      return;
+    }
 
     setLoading(true);
     try {
       await leaveApi.apply({
         ...form,
+        reason: form.reason.trim(),
         type: form.type.toUpperCase() === "ANNUAL" ? "VACATION" : form.type.toUpperCase(),
       });
       setSuccess(true);
@@ -157,7 +153,7 @@ export default function ApplyLeave() {
           period: form.from === form.to
             ? formatDate(form.from)
             : `${formatDate(form.from)} – ${formatDate(form.to)}`,
-          reason: form.reason || "No reason provided",
+          reason: form.reason.trim(),
           status: "PENDING",
           link: false,
         },
@@ -347,7 +343,7 @@ export default function ApplyLeave() {
 
                 {history.length === 0 && (
                   <div className="py-12 text-center text-slate-400 text-[13px]">
-                    No leave history yet. Submit your first request!
+                    No leave history yet.
                   </div>
                 )}
               </>

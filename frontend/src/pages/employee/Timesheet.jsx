@@ -3,8 +3,6 @@ import EmployeeLayout from "../../layouts/EmployeeLayout";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { attendanceApi } from "../../services/api";
 
-// ── Sample attendance data keyed by "YYYY-MM-DD" ──────────────────────────
-
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const MONTHS = [
@@ -29,6 +27,7 @@ export default function Timesheet() {
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0-indexed
   const [records, setRecords] = useState({});
+  const [error, setError] = useState("");
 
   const monthKey = `${viewYear}-${pad(viewMonth + 1)}`;
   const monthSummary = useMemo(() => {
@@ -46,7 +45,6 @@ export default function Timesheet() {
         const data = await attendanceApi.getMyAttendance();
         if (!active) return;
         const rows = Array.isArray(data) ? data : data?.data || [];
-        if (!rows.length) return;
 
         const mapped = rows.reduce((acc, row) => {
           const key = new Date(row.date).toISOString().slice(0, 10);
@@ -57,7 +55,9 @@ export default function Timesheet() {
         }, {});
 
         setRecords(mapped);
-      } catch {}
+      } catch (err) {
+        if (active) setError(err.message || "Unable to load attendance records.");
+      }
     }
 
     loadAttendance();
@@ -73,9 +73,11 @@ export default function Timesheet() {
     else setViewMonth(m => m - 1);
   };
   const nextMonth = () => {
+    if (viewYear === today.getFullYear() && viewMonth === today.getMonth()) return;
     if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
     else setViewMonth(m => m + 1);
   };
+  const isCurrentMonth = viewYear === today.getFullYear() && viewMonth === today.getMonth();
 
   const getKey = (day) =>
     `${viewYear}-${pad(viewMonth + 1)}-${pad(day)}`;
@@ -96,6 +98,12 @@ export default function Timesheet() {
             View your clock in/out records and hours worked
           </p>
         </div>
+
+        {error ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+            {error}
+          </div>
+        ) : null}
 
         {/* Calendar Card */}
         <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
@@ -145,7 +153,8 @@ export default function Timesheet() {
               </span>
               <button
                 onClick={nextMonth}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                disabled={isCurrentMonth}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronRight size={16} strokeWidth={2.5} />
               </button>

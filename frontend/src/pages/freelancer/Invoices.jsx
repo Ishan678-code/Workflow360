@@ -3,13 +3,9 @@ import FreelancerLayout from "../../layouts/FreelancerLayout";
 import { invoiceApi } from "../../services/api";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 
-const fallbackInvoices = [
-  { _id: "inv-1", invoiceNumber: "INV-3021", issuedAt: "2026-03-10", amount: 3200, status: "SENT" },
-  { _id: "inv-2", invoiceNumber: "INV-3022", issuedAt: "2026-03-18", amount: 1800, status: "PAID" },
-];
-
 export default function FreelancerInvoices() {
-  const [invoices, setInvoices] = useState(fallbackInvoices);
+  const [invoices, setInvoices] = useState([]);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -18,8 +14,10 @@ export default function FreelancerInvoices() {
       try {
         const data = await invoiceApi.getAll();
         if (!active) return;
-        setInvoices(Array.isArray(data) ? data : data?.data || fallbackInvoices);
-      } catch {}
+        setInvoices(Array.isArray(data) ? data : data?.data || []);
+      } catch (err) {
+        if (active) setError(err.message || "Unable to load invoices.");
+      }
     }
 
     loadInvoices();
@@ -35,8 +33,13 @@ export default function FreelancerInvoices() {
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Invoices</h1>
           <p className="mt-2 text-sm text-slate-500">Billing history, payment state, and issued totals.</p>
         </div>
+        {error ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+            {error}
+          </div>
+        ) : null}
         <div className="grid gap-4 md:grid-cols-2">
-          {invoices.map((invoice) => (
+          {invoices.length ? invoices.map((invoice) => (
             <article key={invoice._id || invoice.invoiceNumber} className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between gap-4">
                 <div>
@@ -60,7 +63,11 @@ export default function FreelancerInvoices() {
                 </div>
               </div>
             </article>
-          ))}
+          )) : (
+            <div className="rounded-3xl border border-slate-100 bg-white px-4 py-12 text-center text-sm text-slate-400 shadow-sm md:col-span-2">
+              No invoices have been issued yet.
+            </div>
+          )}
         </div>
       </div>
     </FreelancerLayout>

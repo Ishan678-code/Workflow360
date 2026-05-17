@@ -1,12 +1,12 @@
 import mongoose from "mongoose";
 
 const employeeSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  employeeCode: String,
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
+  employeeCode: { type: String, required: true, trim: true, uppercase: true, unique: true },
   department: { type: mongoose.Schema.Types.ObjectId, ref: "Department" },
   designation: { type: mongoose.Schema.Types.ObjectId, ref: "Role" },
   manager: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  salary: Number,
+  salary: { type: Number, min: 0, default: 0 },
   joiningDate: Date,
   phone: String,
   emergencyContact: String,

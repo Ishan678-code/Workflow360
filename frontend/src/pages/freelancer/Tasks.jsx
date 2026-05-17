@@ -4,12 +4,6 @@ import { taskApi, analyticsApi } from "../../services/api";
 import { downloadBlob } from "../../utils/formatters";
 import { Download } from "lucide-react";
 
-const fallbackTasks = [
-  { _id: "task-1", title: "Finalize onboarding flow copy", status: "IN_PROGRESS", priority: "HIGH" },
-  { _id: "task-2", title: "Ship analytics chart refinements", status: "TODO", priority: "MEDIUM" },
-  { _id: "task-3", title: "Prepare handoff notes", status: "DONE", priority: "LOW" },
-];
-
 const quadrantStyles = {
   Q1: { bg: "bg-rose-50",   text: "text-rose-700",   label: "Q1 · Do First" },
   Q2: { bg: "bg-amber-50",  text: "text-amber-700",  label: "Q2 · Schedule" },
@@ -18,11 +12,12 @@ const quadrantStyles = {
 };
 
 export default function FreelancerTasks() {
-  const [tasks, setTasks] = useState(fallbackTasks);
+  const [tasks, setTasks] = useState([]);
   const [prioritizedTasks, setPrioritizedTasks] = useState([]);
   const [viewMode, setViewMode] = useState("standard");
   const [loadingPriority, setLoadingPriority] = useState(false);
   const [downloadingReport, setDownloadingReport] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -31,8 +26,10 @@ export default function FreelancerTasks() {
       try {
         const data = await taskApi.getMyTasks();
         if (!active) return;
-        setTasks(Array.isArray(data) ? data : data?.data || fallbackTasks);
-      } catch {}
+        setTasks(Array.isArray(data) ? data : data?.data || []);
+      } catch (err) {
+        if (active) setError(err.message || "Unable to load tasks.");
+      }
     }
 
     loadTasks();
@@ -47,7 +44,8 @@ export default function FreelancerTasks() {
       const data = await taskApi.getPrioritized();
       const rows = Array.isArray(data) ? data : data?.tasks || data?.data || [];
       setPrioritizedTasks(rows);
-    } catch {
+    } catch (err) {
+      setError(err.message || "Unable to prioritize tasks.");
       setPrioritizedTasks([]);
     } finally {
       setLoadingPriority(false);
@@ -69,7 +67,9 @@ export default function FreelancerTasks() {
       if (!userId) return;
       const blob = await analyticsApi.downloadPerformanceReport(userId, 30);
       downloadBlob(blob, `performance-report-${userId}.pdf`);
-    } catch {} finally {
+    } catch (err) {
+      setError(err.message || "Unable to download report.");
+    } finally {
       setDownloadingReport(false);
     }
   }
@@ -95,6 +95,12 @@ export default function FreelancerTasks() {
             {downloadingReport ? "Downloading..." : "Performance Report"}
           </button>
         </div>
+
+        {error ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+            {error}
+          </div>
+        ) : null}
 
         {/* View Toggle */}
         <div className="flex items-center gap-2">

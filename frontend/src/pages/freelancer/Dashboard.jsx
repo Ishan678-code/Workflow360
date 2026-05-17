@@ -6,11 +6,12 @@ import { formatCurrency } from "../../utils/formatters";
 
 export default function FreelancerDashboard() {
   const [summary, setSummary] = useState({
-    activeProjects: 3,
-    openInvoices: 2,
-    loggedHours: 28,
-    earnings: 6400,
+    activeProjects: 0,
+    openInvoices: 0,
+    loggedHours: 0,
+    earnings: 0,
   });
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -29,24 +30,30 @@ export default function FreelancerDashboard() {
       const timesheetList = timesheets.status === "fulfilled" ? (Array.isArray(timesheets.value) ? timesheets.value : timesheets.value?.data || []) : [];
 
       setSummary({
-        activeProjects: projectList.length || 3,
-        openInvoices: invoiceList.filter((item) => String(item.status || "").toUpperCase() !== "PAID").length || 2,
-        loggedHours: timesheetList.reduce((total, item) => total + Number(item.hours || 0), 0) || 28,
-        earnings: invoiceList.reduce((total, item) => total + Number(item.amount || item.totalAmount || 0), 0) || 6400,
+        activeProjects: projectList.length,
+        openInvoices: invoiceList.filter((item) => String(item.status || "").toUpperCase() !== "PAID").length,
+        loggedHours: timesheetList.reduce((total, item) => total + Number(item.hours || 0), 0),
+        earnings: invoiceList.reduce((total, item) => total + Number(item.amount || item.totalAmount || 0), 0),
       });
+
+      if (projects.status === "rejected" && invoices.status === "rejected" && timesheets.status === "rejected") {
+        setError("Workspace data is unavailable right now.");
+      }
     }
 
-    loadSummary().catch(() => {});
+    loadSummary().catch((err) => {
+      if (active) setError(err.message || "Workspace data is unavailable right now.");
+    });
     return () => {
       active = false;
     };
   }, []);
 
   const cards = [
-    { label: "Active Projects", value: summary.activeProjects, icon: FolderKanban, tone: "bg-amber-100 text-amber-700" },
-    { label: "Open Invoices", value: summary.openInvoices, icon: Receipt, tone: "bg-rose-100 text-rose-700" },
-    { label: "Logged Hours", value: summary.loggedHours, icon: Timer, tone: "bg-sky-100 text-sky-700" },
-    { label: "Earnings", value: formatCurrency(summary.earnings), icon: Wallet, tone: "bg-emerald-100 text-emerald-700" },
+    { label: "Active Projects", value: summary.activeProjects, icon: <FolderKanban size={22} />, tone: "bg-amber-100 text-amber-700" },
+    { label: "Open Invoices", value: summary.openInvoices, icon: <Receipt size={22} />, tone: "bg-rose-100 text-rose-700" },
+    { label: "Logged Hours", value: summary.loggedHours, icon: <Timer size={22} />, tone: "bg-sky-100 text-sky-700" },
+    { label: "Earnings", value: formatCurrency(summary.earnings), icon: <Wallet size={22} />, tone: "bg-emerald-100 text-emerald-700" },
   ];
 
   return (
@@ -60,8 +67,14 @@ export default function FreelancerDashboard() {
           </p>
         </section>
 
+        {error ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+            {error}
+          </div>
+        ) : null}
+
         <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          {cards.map(({ label, value, icon: Icon, tone }) => (
+          {cards.map(({ label, value, icon, tone }) => (
             <article key={label} className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -69,7 +82,7 @@ export default function FreelancerDashboard() {
                   <p className="mt-3 text-3xl font-black tracking-tight text-slate-900">{value}</p>
                 </div>
                 <div className={`rounded-2xl p-3 ${tone}`}>
-                  <Icon size={22} />
+                  {icon}
                 </div>
               </div>
             </article>

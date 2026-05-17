@@ -15,7 +15,8 @@ function getStoredUser() {
 
 export default function Notifications() {
   const user = useMemo(() => getStoredUser(), []);
-  const hasUser = Boolean(user?.id);
+  const userId = user?.id || user?._id;
+  const hasUser = Boolean(userId);
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(hasUser);
@@ -30,7 +31,8 @@ export default function Notifications() {
       .getNotifications()
       .then((data) => {
         if (!canceled) {
-          setNotifications(Array.isArray(data) ? data : []);
+          const list = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+          setNotifications(list);
         }
       })
       .catch(() => {
@@ -50,15 +52,19 @@ export default function Notifications() {
 
     const socket = io(BACKEND_URL, {
       path: "/socket.io",
-      transports: ["websocket"],
+      timeout: 5000,
+      reconnectionAttempts: 3,
     });
 
     socket.on("connect", () => {
-      socket.emit("join", user.id);
+      socket.emit("join", userId);
     });
 
     socket.on("notification", (notification) => {
-      setNotifications((prev) => [notification, ...(prev || [])]);
+      setNotifications((prev) => [
+        { ...notification, isRead: notification.isRead ?? false },
+        ...(prev || []),
+      ]);
     });
 
     socketRef.current = socket;
@@ -67,7 +73,7 @@ export default function Notifications() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [hasUser, user?.id]);
+  }, [hasUser, userId]);
 
   const unreadCount = notifications.filter((item) => !item.isRead).length;
 

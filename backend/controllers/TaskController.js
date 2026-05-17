@@ -1,7 +1,24 @@
 import Task from "../models/Task.js";
 import User from "../models/User.js";
+import Project from "../models/Project.js";
 import { prioritizeTasks, quadrantSummary } from "../services/taskPriorityService.js";
 import { createNotification } from "../services/notificationService.js";
+
+const VALID_STATUSES = ["TODO", "IN_PROGRESS", "COMPLETED"];
+const VALID_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+
+function startOfDay(value) {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+async function canManageProject(user, projectId) {
+  if (user.role === "ADMIN") return true;
+  const project = await Project.findById(projectId).select("manager ownerManager");
+  if (!project) return false;
+  return [project.manager, project.ownerManager].some((id) => id?.toString() === user.id);
+}
 
 export const createTask = async (req, res) => {
   try {
@@ -11,8 +28,27 @@ export const createTask = async (req, res) => {
       return res.status(400).json({ message: "title and project are required" });
     }
 
+    if (priority && !VALID_PRIORITIES.includes(priority)) {
+      return res.status(400).json({ message: "Invalid priority" });
+    }
+
+    if (deadline) {
+      const deadlineDate = startOfDay(deadline);
+      const today = startOfDay(new Date());
+      if (Number.isNaN(deadlineDate.getTime())) {
+        return res.status(400).json({ message: "deadline must be a valid date" });
+      }
+      if (deadlineDate < today) {
+        return res.status(400).json({ message: "deadline cannot be in the past" });
+      }
+    }
+
+    if (!(await canManageProject(req.user, project))) {
+      return res.status(403).json({ message: "You can only create tasks for projects you manage" });
+    }
+
     const task = await Task.create({
-      title,
+      title: String(title).trim(),
       description,
       project,
       assignee,
@@ -79,20 +115,23 @@ export const updateTaskStatus = async (req, res) => {
   try {
     const { status } = req.body;
 
-    const validStatuses = ["TODO", "IN_PROGRESS", "COMPLETED"];
-    if (!validStatuses.includes(status)) {
+    if (!VALID_STATUSES.includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
     }
 
-    const task = await Task.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true }
-    );
-
+    const task = await Task.findById(req.params.id);
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
+
+    const isAssignee = task.assignee?.toString() === req.user.id;
+    const isProjectManager = await canManageProject(req.user, task.project);
+    if (!isAssignee && !isProjectManager) {
+      return res.status(403).json({ message: "You can only update tasks assigned to you or projects you manage" });
+    }
+
+    task.status = status;
+    await task.save();
 
     res.json({ message: "Task status updated", task });
   } catch (error) {
@@ -102,12 +141,29 @@ export const updateTaskStatus = async (req, res) => {
 
 export const updateTask = async (req, res) => {
   try {
-    const task = await Task.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
+    const existing = await Task.findById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+    if (!(await canManageProject(req.user, existing.project))) {
+      return res.status(403).json({ message: "You can only update tasks for projects you manage" });
+    }
 
+    const updates = { ...req.body };
+    if (updates.status && !VALID_STATUSES.includes(updates.status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+    if (updates.priority && !VALID_PRIORITIES.includes(updates.priority)) {
+      return res.status(400).json({ message: "Invalid priority" });
+    }
+    if (updates.deadline) {
+      const deadlineDate = startOfDay(updates.deadline);
+      if (Number.isNaN(deadlineDate.getTime())) {
+        return res.status(400).json({ message: "deadline must be a valid date" });
+      }
+    }
+
+    const task = await Task.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
@@ -120,11 +176,15 @@ export const updateTask = async (req, res) => {
 
 export const deleteTask = async (req, res) => {
   try {
-    const task = await Task.findByIdAndDelete(req.params.id);
-
+    const task = await Task.findById(req.params.id);
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
+    if (!(await canManageProject(req.user, task.project))) {
+      return res.status(403).json({ message: "You can only delete tasks for projects you manage" });
+    }
+
+    await task.deleteOne();
 
     res.json({ message: "Task deleted" });
   } catch (error) {

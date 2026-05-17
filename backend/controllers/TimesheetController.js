@@ -1,5 +1,19 @@
 import Timesheet from "../models/Timesheet.js";
+import Project from "../models/Project.js";
 import { getFreelancerProfileByUserId } from "../utils/profileRefs.js";
+
+function startOfDay(value) {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+async function canApproveTimesheet(user, timesheet) {
+  if (user.role === "ADMIN") return true;
+  const project = await Project.findById(timesheet.project).select("manager ownerManager");
+  if (!project) return false;
+  return [project.manager, project.ownerManager].some((id) => id?.toString() === user.id);
+}
 
 export const logTime = async (req, res) => {
   try {
@@ -14,15 +28,42 @@ export const logTime = async (req, res) => {
       return res.status(400).json({ message: "project, hours, and date are required" });
     }
 
-    if (hours <= 0 || hours > 24) {
+    const numericHours = Number(hours);
+    if (numericHours <= 0 || numericHours > 24) {
       return res.status(400).json({ message: "Hours must be between 0 and 24" });
+    }
+
+    const entryDate = startOfDay(date);
+    const today = startOfDay(new Date());
+    if (Number.isNaN(entryDate.getTime())) {
+      return res.status(400).json({ message: "date must be valid" });
+    }
+    if (entryDate > today) {
+      return res.status(400).json({ message: "Future timesheets are not allowed" });
+    }
+
+    const assignedProject = await Project.findOne({
+      _id: project,
+      freelancers: freelancerProfile._id
+    });
+    if (!assignedProject) {
+      return res.status(403).json({ message: "You can only log time for projects assigned to you" });
+    }
+
+    const existing = await Timesheet.findOne({
+      freelancer: freelancerProfile._id,
+      project,
+      date: entryDate
+    });
+    if (existing) {
+      return res.status(400).json({ message: "Timesheet already submitted for this project and date" });
     }
 
     const timesheet = await Timesheet.create({
       freelancer: freelancerProfile._id,
       project,
-      hours,
-      date,
+      hours: numericHours,
+      date: entryDate,
       status: "PENDING"
     });
 
@@ -78,15 +119,21 @@ export const getAllTimesheets = async (req, res) => {
 
 export const approveTimesheet = async (req, res) => {
   try {
-    const timesheet = await Timesheet.findByIdAndUpdate(
-      req.params.id,
-      { status: "APPROVED" },
-      { new: true }
-    );
-
+    const timesheet = await Timesheet.findById(req.params.id);
     if (!timesheet) {
       return res.status(404).json({ message: "Timesheet not found" });
     }
+
+    if (timesheet.status !== "PENDING") {
+      return res.status(400).json({ message: "Only pending timesheets can be approved" });
+    }
+
+    if (!(await canApproveTimesheet(req.user, timesheet))) {
+      return res.status(403).json({ message: "You can only approve timesheets for projects you manage" });
+    }
+
+    timesheet.status = "APPROVED";
+    await timesheet.save();
 
     res.json({ message: "Timesheet approved", timesheet });
   } catch (error) {

@@ -115,20 +115,12 @@ const StatusSummaryCard = ({ label, count }) => {
 };
 
 export default function MyTasks() {
-  const [tasks, setTasks] = useState([
-    { name: "Complete API Integration", priority: "HIGH", deadline: "Mar 12, 2026", status: "In Progress" },
-    { name: "Review Code PR #245", priority: "HIGH", deadline: "Mar 11, 2026", status: "In Progress" },
-    { name: "Update Documentation", priority: "MEDIUM", deadline: "Mar 15, 2026", status: "To Do" },
-    { name: "Team Meeting Preparation", priority: "MEDIUM", deadline: "Mar 10, 2026", status: "Completed" },
-    { name: "Research New Framework", priority: "LOW", deadline: "Mar 20, 2026", status: "To Do" },
-    { name: "Fix Login Bug", priority: "HIGH", deadline: "Mar 13, 2026", status: "To Do" },
-    { name: "Write Unit Tests", priority: "MEDIUM", deadline: "Mar 18, 2026", status: "To Do" },
-    { name: "Deploy to Staging", priority: "LOW", deadline: "Mar 25, 2026", status: "To Do" },
-  ]);
+  const [tasks, setTasks] = useState([]);
   const [prioritizedTasks, setPrioritizedTasks] = useState([]);
   const [viewMode, setViewMode] = useState("standard"); // "standard" | "priority"
   const [loadingPriority, setLoadingPriority] = useState(false);
   const [downloadingReport, setDownloadingReport] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -138,7 +130,6 @@ export default function MyTasks() {
         const data = await taskApi.getMyTasks();
         if (!active) return;
         const rows = Array.isArray(data) ? data : data?.data || [];
-        if (!rows.length) return;
         setTasks(rows.map((task) => ({
           id: task._id,
           name: task.title,
@@ -151,7 +142,9 @@ export default function MyTasks() {
                 ? "Completed"
                 : "To Do",
         })));
-      } catch {}
+      } catch (err) {
+        if (active) setError(err.message || "Unable to load tasks.");
+      }
     }
 
     loadTasks();
@@ -180,7 +173,8 @@ export default function MyTasks() {
         quadrant: task.quadrant || null,
         quadrantLabel: task.quadrantLabel || null,
       })));
-    } catch {
+    } catch (err) {
+      setError(err.message || "Unable to prioritize tasks.");
       setPrioritizedTasks([]);
     } finally {
       setLoadingPriority(false);
@@ -202,7 +196,9 @@ export default function MyTasks() {
       if (!userId) return;
       const blob = await analyticsApi.downloadPerformanceReport(userId, 30);
       downloadBlob(blob, `performance-report-${userId}.pdf`);
-    } catch {} finally {
+    } catch (err) {
+      setError(err.message || "Unable to download report.");
+    } finally {
       setDownloadingReport(false);
     }
   }
@@ -234,6 +230,12 @@ export default function MyTasks() {
             {downloadingReport ? "Downloading..." : "Performance Report"}
           </button>
         </div>
+
+        {error ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+            {error}
+          </div>
+        ) : null}
 
         {/* View Toggle */}
         <div className="flex items-center gap-2">
@@ -357,7 +359,9 @@ export default function MyTasks() {
                             if (task.id) {
                               try {
                                 await taskApi.updateStatus(task.id, apiStatus);
-                              } catch {}
+                              } catch (err) {
+                                setError(err.message || "Unable to update task status.");
+                              }
                             }
                           }}
                         />

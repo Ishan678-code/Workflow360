@@ -3,12 +3,6 @@ import ManagerLayout from "../../layouts/ManagerLayout";
 import { leaveApi } from "../../services/api";
 import { formatDate } from "../../utils/formatters";
 
-const fallbackLeaves = [
-  { _id: "lv-1", employeeName: "Ava Wilson", type: "Annual", startDate: "2026-03-28", endDate: "2026-03-30", status: "PENDING" },
-  { _id: "lv-2", employeeName: "Noah Carter", type: "Sick", startDate: "2026-03-26", endDate: "2026-03-26", status: "APPROVED" },
-  { _id: "lv-3", employeeName: "Emma Brooks", type: "Casual", startDate: "2026-04-02", endDate: "2026-04-03", status: "PENDING" },
-];
-
 const statusTone = {
   APPROVED: "bg-emerald-50 text-emerald-700 border-emerald-100",
   REJECTED: "bg-rose-50 text-rose-700 border-rose-100",
@@ -27,7 +21,7 @@ function normalizeLeave(leave) {
 }
 
 export default function ManagerLeaves() {
-  const [leaves, setLeaves] = useState(fallbackLeaves);
+  const [leaves, setLeaves] = useState([]);
   const [error, setError] = useState("");
   const [actionId, setActionId] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -40,7 +34,7 @@ export default function ManagerLeaves() {
       try {
         const data = await leaveApi.getAll();
         if (!active) return;
-        const rows = Array.isArray(data) ? data : data?.data || fallbackLeaves;
+        const rows = Array.isArray(data) ? data : data?.data || [];
         setLeaves(rows.map(normalizeLeave));
         setError("");
       } catch (err) {
@@ -101,7 +95,7 @@ export default function ManagerLeaves() {
 
         {error ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-            {error} Showing sample requests for now.
+            {error}
           </div>
         ) : null}
 
@@ -117,7 +111,7 @@ export default function ManagerLeaves() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {leaves.map((leave) => {
+              {leaves.length ? leaves.map((leave) => {
                 const name = leave.employeeName || leave.employee?.name || "Team Member";
                 const status = String(leave.status || "PENDING").toUpperCase();
                 return (
@@ -161,7 +155,13 @@ export default function ManagerLeaves() {
                     </td>
                   </tr>
                 );
-              })}
+              }) : (
+                <tr>
+                  <td colSpan="6" className="px-6 py-12 text-center text-sm text-slate-400">
+                    No leave requests awaiting review.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

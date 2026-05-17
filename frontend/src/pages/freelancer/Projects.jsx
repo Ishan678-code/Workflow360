@@ -3,13 +3,9 @@ import FreelancerLayout from "../../layouts/FreelancerLayout";
 import { projectApi } from "../../services/api";
 import { formatDate } from "../../utils/formatters";
 
-const fallbackProjects = [
-  { _id: "proj-1", name: "Mobile Redesign", status: "ACTIVE", deadline: "2026-04-15", client: "Northstar Labs" },
-  { _id: "proj-2", name: "Analytics Dashboard", status: "REVIEW", deadline: "2026-04-02", client: "Helio Systems" },
-];
-
 export default function FreelancerProjects() {
-  const [projects, setProjects] = useState(fallbackProjects);
+  const [projects, setProjects] = useState([]);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -18,8 +14,10 @@ export default function FreelancerProjects() {
       try {
         const data = await projectApi.getAll();
         if (!active) return;
-        setProjects(Array.isArray(data) ? data : data?.data || fallbackProjects);
-      } catch {}
+        setProjects(Array.isArray(data) ? data : data?.data || []);
+      } catch (err) {
+        if (active) setError(err.message || "Unable to load projects.");
+      }
     }
 
     loadProjects();
@@ -35,8 +33,13 @@ export default function FreelancerProjects() {
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Projects</h1>
           <p className="mt-2 text-sm text-slate-500">Current client work, delivery timing, and stage at a glance.</p>
         </div>
+        {error ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+            {error}
+          </div>
+        ) : null}
         <div className="grid gap-4 md:grid-cols-2">
-          {projects.map((project) => (
+          {projects.length ? projects.map((project) => (
             <article key={project._id || project.name} className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
               <span className="rounded-full bg-amber-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-amber-700">
                 {project.status || "ACTIVE"}
@@ -53,7 +56,11 @@ export default function FreelancerProjects() {
                 </div>
               </div>
             </article>
-          ))}
+          )) : (
+            <div className="rounded-3xl border border-slate-100 bg-white px-4 py-12 text-center text-sm text-slate-400 shadow-sm md:col-span-2">
+              No projects have been assigned yet.
+            </div>
+          )}
         </div>
       </div>
     </FreelancerLayout>

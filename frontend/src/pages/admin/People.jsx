@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../../layouts/AdminLayout";
-import { departmentApi, employeeApi, freelancerApi, projectApi } from "../../services/api";
+import { authApi, departmentApi, employeeApi, freelancerApi, projectApi } from "../../services/api";
 import { getInitials } from "../../utils/formatters";
 
-const PEOPLE_STATUS_OVERRIDES_KEY = "admin_people_status_overrides";
+const SHOW_DEMO_PEOPLE_ON_API_FAILURE = false;
 
 function normalizeEmployee(person) {
   return {
@@ -25,15 +25,26 @@ function normalizeFreelancer(person) {
   };
 }
 
+function makeEmployeeCode(name) {
+  const initials = String(name)
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("")
+    .slice(0, 3);
+  return `${initials || "EMP"}-${Date.now().toString().slice(-4)}`;
+}
+
 const sampleEmployees = [
   {
     _id: "sample-emp-1",
-    name: "Rajan Thapa",
-    email: "rajan.thapa@workflow360.com",
-    role: "Backend Developer",
-    departmentName: "Backend Department",
-    managerName: "Arun Shrestha",
+    name: "Arun Shrestha",
+    email: "arun.shrestha@workflow360.com",
+    role: "Engineering Manager",
+    departmentName: "Operations Department",
+    managerName: "—",
   },
+
   {
     _id: "sample-emp-2",
     name: "Anita Poudel",
@@ -79,8 +90,8 @@ const sampleEmployees = [
 const sampleFreelancers = [
   {
     _id: "sample-fl-1",
-    name: "Aryan Shrestha",
-    email: "aryan.shrestha@freelance.io",
+    name: "Ramila Shrestha",
+    email: "ramila.shrestha@freelance.io",
     role: "React, Node.js, MongoDB",
     skills: ["React", "Node.js", "MongoDB", "TypeScript"],
     hourlyRate: 35,
@@ -88,8 +99,8 @@ const sampleFreelancers = [
   },
   {
     _id: "sample-fl-2",
-    name: "Priya Tamang",
-    email: "priya.tamang@freelance.io",
+    name: "Gita Tamang",
+    email: "gita.tamang@freelance.io",
     role: "UI/UX Design, Figma, Tailwind CSS",
     skills: ["Figma", "Tailwind CSS", "Adobe XD", "UI/UX Design"],
     hourlyRate: 28,
@@ -97,8 +108,8 @@ const sampleFreelancers = [
   },
   {
     _id: "sample-fl-3",
-    name: "Rohan Gurung",
-    email: "rohan.gurung@freelance.io",
+    name: "Rajan Gurung",
+    email: "rajan.gurung@freelance.io",
     role: "Python, Django, PostgreSQL",
     skills: ["Python", "Django", "PostgreSQL", "REST APIs"],
     hourlyRate: 40,
@@ -134,34 +145,24 @@ const sampleFreelancers = [
 ];
 
 const statusColors = {
-  Available: "bg-emerald-50 text-emerald-700",
+  Active: "bg-emerald-50 text-emerald-700",
+  Inactive: "bg-slate-100 text-slate-600",
   "On Project": "bg-blue-50 text-blue-700",
 };
 
 const defaultDepartmentOptions = [
-  { _id: "default-backend", name: "Backend Department" },
-  { _id: "default-frontend", name: "Frontend Department" },
-  { _id: "default-fullstack", name: "Full Stack Department" },
-  { _id: "default-mobile", name: "Mobile App Department" },
-  { _id: "default-devops", name: "DevOps Department" },
-  { _id: "default-qa", name: "QA Department" },
-  { _id: "default-uiux", name: "UI/UX Department" },
-  { _id: "default-product", name: "Product Department" },
-  { _id: "default-hr", name: "HR Department" },
-  { _id: "default-finance", name: "Finance Department" },
-  { _id: "default-operations", name: "Operations Department" },
-  { _id: "default-support", name: "IT Support Department" },
+  { _id: "HR Department", name: "HR Department" },
+  { _id: "Frontend Department", name: "Frontend Department" },
+  { _id: "Backend Department", name: "Backend Department" },
+  { _id: "Mobile App Department", name: "Mobile App Department" },
+  { _id: "Design Department", name: "Design Department" },
+  { _id: "UI/UX Department", name: "UI/UX Department" },
+  { _id: "DevOps Department", name: "DevOps Department" },
+  { _id: "QA Department", name: "QA Department" },
+  { _id: "Product Department", name: "Product Department" },
+  { _id: "Finance Department", name: "Finance Department" },
+  { _id: "Operations Department", name: "Operations Department" },
 ];
-
-function readStatusOverrides() {
-  try {
-    const stored = localStorage.getItem(PEOPLE_STATUS_OVERRIDES_KEY);
-    const parsed = stored ? JSON.parse(stored) : {};
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
-}
 
 export default function AdminPeople() {
   const [employees, setEmployees] = useState([]);
@@ -170,6 +171,10 @@ export default function AdminPeople() {
   const [error, setError] = useState("");
   const [projects, setProjects] = useState([]);
   const [isDepartmentModalOpen, setIsDepartmentModalOpen] = useState(false);
+  const [isAddDepartmentModalOpen, setIsAddDepartmentModalOpen] = useState(false);
+  const [newDepartmentName, setNewDepartmentName] = useState("");
+  const [newDepartmentNotice, setNewDepartmentNotice] = useState("");
+  const [isSavingDepartment, setIsSavingDepartment] = useState(false);
   const [isMatchModalOpen, setIsMatchModalOpen] = useState(false);
   const [matchForm, setMatchForm] = useState({ projectId: "", description: "", requiredSkills: "" });
   const [matchResults, setMatchResults] = useState([]);
@@ -181,84 +186,240 @@ export default function AdminPeople() {
     employeeEmail: "",
     employeeRole: "",
     departmentId: "",
+    managerId: "",
   });
   const [isSavingAssignment, setIsSavingAssignment] = useState(false);
   const [assignmentNotice, setAssignmentNotice] = useState("");
-  const [statusOverrides, setStatusOverrides] = useState(() => readStatusOverrides());
+  const [isAddPersonModalOpen, setIsAddPersonModalOpen] = useState(false);
+  const [isSavingPerson, setIsSavingPerson] = useState(false);
+  const [personNotice, setPersonNotice] = useState("");
+  const [personType, setPersonType] = useState("EMPLOYEE");
+  const [personForm, setPersonForm] = useState({
+    name: "",
+    email: "",
+    roleLabel: "Employee",
+    departmentId: "",
+    designation: "",
+    employeeCode: "",
+    manager: "",
+    salary: "",
+    skills: "",
+    hourlyRate: "",
+    portfolioUrl: "",
+    timezone: "",
+  });
+
+  async function loadPeople(active = true) {
+    const [employeeRes, freelancerRes, departmentRes, projectRes] = await Promise.allSettled([
+      employeeApi.getAll(),
+      freelancerApi.getAll(),
+      departmentApi.getAll(),
+      projectApi.getAll(),
+    ]);
+
+    if (!active) return;
+
+    const employeeList =
+      employeeRes.status === "fulfilled"
+        ? Array.isArray(employeeRes.value)
+          ? employeeRes.value
+          : employeeRes.value?.data || []
+        : [];
+    const freelancerList =
+      freelancerRes.status === "fulfilled"
+        ? Array.isArray(freelancerRes.value)
+          ? freelancerRes.value
+          : freelancerRes.value?.data || []
+        : [];
+    const departmentList =
+      departmentRes.status === "fulfilled"
+        ? Array.isArray(departmentRes.value)
+          ? departmentRes.value
+          : departmentRes.value?.data || []
+        : [];
+    const projectList =
+      projectRes.status === "fulfilled"
+        ? Array.isArray(projectRes.value)
+          ? projectRes.value
+          : projectRes.value?.data || []
+        : [];
+
+    if (
+      employeeRes.status === "rejected" &&
+      freelancerRes.status === "rejected" &&
+      departmentRes.status === "rejected" &&
+      projectRes.status === "rejected"
+    ) {
+      setError("Unable to load people data right now.");
+    }
+
+    const normalizedApiEmployees = employeeList.map(normalizeEmployee);
+    setEmployees(
+      employeeRes.status === "rejected"
+        ? SHOW_DEMO_PEOPLE_ON_API_FAILURE
+          ? sampleEmployees
+          : []
+        : normalizedApiEmployees
+    );
+
+    const normalizedApiFreelancers = freelancerList.map(normalizeFreelancer);
+    setFreelancers(
+      freelancerRes.status === "rejected"
+        ? SHOW_DEMO_PEOPLE_ON_API_FAILURE
+          ? sampleFreelancers
+          : []
+        : normalizedApiFreelancers
+    );
+
+    setDepartments(departmentList);
+    setProjects(projectList);
+  }
 
   useEffect(() => {
     let active = true;
-
-    async function loadPeople() {
-      const [employeeRes, freelancerRes, departmentRes, projectRes] = await Promise.allSettled([
-        employeeApi.getAll(),
-        freelancerApi.getAll(),
-        departmentApi.getAll(),
-        projectApi.getAll(),
-      ]);
-
-      if (!active) return;
-
-      const employeeList =
-        employeeRes.status === "fulfilled"
-          ? Array.isArray(employeeRes.value)
-            ? employeeRes.value
-            : employeeRes.value?.data || []
-          : [];
-      const freelancerList =
-        freelancerRes.status === "fulfilled"
-          ? Array.isArray(freelancerRes.value)
-            ? freelancerRes.value
-            : freelancerRes.value?.data || []
-          : [];
-      const departmentList =
-        departmentRes.status === "fulfilled"
-          ? Array.isArray(departmentRes.value)
-            ? departmentRes.value
-            : departmentRes.value?.data || []
-          : [];
-      const projectList =
-        projectRes.status === "fulfilled"
-          ? Array.isArray(projectRes.value)
-            ? projectRes.value
-            : projectRes.value?.data || []
-          : [];
-
-      if (employeeRes.status === "rejected" && freelancerRes.status === "rejected" && departmentRes.status === "rejected") {
-        setError("Unable to load people data right now.");
-      }
-
-      const normalizedApiEmployees = employeeList.map(normalizeEmployee);
-      setEmployees(employeeRes.status === "rejected" ? sampleEmployees : normalizedApiEmployees);
-
-      const normalizedApiFreelancers = freelancerList.map(normalizeFreelancer);
-      setFreelancers(freelancerRes.status === "rejected" ? sampleFreelancers : normalizedApiFreelancers);
-
-      setDepartments(departmentList);
-      setProjects(projectList);
-    }
-
-    loadPeople().catch(() => {
+    loadPeople(active).catch(() => {
       if (active) setError("Unable to load people data right now.");
     });
-
     return () => {
       active = false;
     };
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem(PEOPLE_STATUS_OVERRIDES_KEY, JSON.stringify(statusOverrides));
-  }, [statusOverrides]);
-
-  function getPersonStatus(person) {
-    return statusOverrides[person._id] || "Available";
+  function resetPersonForm() {
+    setPersonType("EMPLOYEE");
+    setPersonForm({
+      name: "",
+      email: "",
+      roleLabel: "Employee",
+      departmentId: "",
+      designation: "",
+      employeeCode: "",
+      manager: "",
+      salary: "",
+      skills: "",
+      hourlyRate: "",
+      portfolioUrl: "",
+      timezone: "",
+    });
+    setPersonNotice("");
   }
 
-  function toggleStatus(person) {
-    const current = getPersonStatus(person);
-    const next = current === "Available" ? "On Project" : "Available";
-    setStatusOverrides((prev) => ({ ...prev, [person._id]: next }));
+  function openAddPersonModal() {
+    resetPersonForm();
+    setIsAddPersonModalOpen(true);
+  }
+
+  function closeAddPersonModal() {
+    if (isSavingPerson) return;
+    setIsAddPersonModalOpen(false);
+    setPersonNotice("");
+  }
+
+  function isTemporaryDepartmentId(id) {
+    return typeof id === "string" && id.startsWith("default-");
+  }
+
+  async function resolveDepartmentId(departmentId) {
+    if (!departmentId) return undefined;
+    const existing = departmentOptions.find((dept) => dept._id === departmentId);
+    if (!existing) return departmentId;
+    if (!isTemporaryDepartmentId(existing._id)) return existing._id;
+
+    const result = await departmentApi.create({ name: existing.name });
+    const createdDepartment = result?.data || result;
+    if (createdDepartment && createdDepartment._id) {
+      setDepartments((current) => [createdDepartment, ...current]);
+      return createdDepartment._id;
+    }
+
+    return departmentId;
+  }
+
+  async function handleAddPersonSubmit(event) {
+    event.preventDefault();
+
+    if (!personForm.name.trim() || !personForm.email.trim()) {
+      setPersonNotice("Name and email are required.");
+      return;
+    }
+
+    if (personForm.salary && Number(personForm.salary) < 0) {
+      setPersonNotice("Salary cannot be negative.");
+      return;
+    }
+
+    if (personForm.hourlyRate && Number(personForm.hourlyRate) < 0) {
+      setPersonNotice("Hourly rate cannot be negative.");
+      return;
+    }
+
+    const autoPassword = `Wf360!${Math.random().toString(36).slice(2, 10)}A`;
+
+    setIsSavingPerson(true);
+    setPersonNotice("");
+
+    try {
+      const role = personType === "FREELANCER" ? "FREELANCER" : personType === "MANAGER" ? "MANAGER" : "EMPLOYEE";
+      const registration = await authApi.register({
+        name: personForm.name.trim(),
+        email: personForm.email.trim(),
+        password: autoPassword,
+        role,
+      });
+
+      const createdUser = registration?.user || registration;
+      const userId = createdUser?._id || createdUser?.id;
+      if (!userId) {
+        throw new Error("Unable to create user account.");
+      }
+
+      if (personType === "EMPLOYEE" || personType === "MANAGER") {
+        const employeeCode = personForm.employeeCode.trim() || makeEmployeeCode(personForm.name);
+        const departmentId = await resolveDepartmentId(personForm.departmentId);
+        await employeeApi.create({
+          userId,
+          employeeCode,
+          department: departmentId || undefined,
+          designation: personForm.designation || personForm.roleLabel || undefined,
+          ...(personForm.manager ? { manager: personForm.manager } : {}),
+          ...(personForm.salary ? { salary: Number(personForm.salary) } : {}),
+        });
+      } else {
+        const skills = String(personForm.skills)
+          .split(",")
+          .map((skill) => skill.trim())
+          .filter(Boolean);
+
+        if (skills.length === 0) {
+          throw new Error("Please enter at least one skill for the freelancer.");
+        }
+
+        await freelancerApi.create({
+          userId,
+          hourlyRate: Number(personForm.hourlyRate) || 0,
+          skills,
+          portfolioUrl: personForm.portfolioUrl || undefined,
+          timezone: personForm.timezone || undefined,
+        });
+      }
+
+      await loadPeople();
+      setPersonNotice(`${personType === "EMPLOYEE" ? "Employee" : personType === "MANAGER" ? "Manager" : "Freelancer"} added successfully.`);
+      setTimeout(() => {
+        setIsAddPersonModalOpen(false);
+        resetPersonForm();
+      }, 800);
+    } catch (err) {
+      setPersonNotice(err?.message || "Failed to add the person. Please try again.");
+    } finally {
+      setIsSavingPerson(false);
+    }
+  }
+
+  function getPersonStatus(person) {
+    if (person.isActive === false || person.userId?.isActive === false) return "Inactive";
+    if (person.currentProject || person.activeProject || person.project) return "On Project";
+    return "Active";
   }
 
   const selectedEmployee = employees.find((employee) => {
@@ -279,14 +440,17 @@ export default function AdminPeople() {
       && String(employee.role || "").trim().toLowerCase() === normalizedRole;
   });
 
+  const managerOptions = employees.filter((person) =>
+    String(person.role || "").toLowerCase().includes("manager")
+  );
+
   const departmentOptions = [
     ...departments,
-    ...defaultDepartmentOptions.filter(
-      (defaultDepartment) =>
-        !departments.some(
-          (department) =>
-            String(department.name || "").trim().toLowerCase() === defaultDepartment.name.toLowerCase()
-        )
+    ...defaultDepartmentOptions.filter((defaultDept) =>
+      !departments.some(
+        (department) =>
+          String(department.name || "").trim().toLowerCase() === defaultDept.name.toLowerCase()
+      )
     ),
   ];
 
@@ -300,7 +464,7 @@ export default function AdminPeople() {
       (f) => String(f.departmentName || "").trim().toLowerCase() === deptName
     );
     const onProjectFreelancers = deptFreelancers.filter(
-      (f) => (statusOverrides[f._id] || "Available") === "On Project"
+      (f) => getPersonStatus(f) === "On Project"
     );
 
     return {
@@ -312,7 +476,7 @@ export default function AdminPeople() {
       freelancerCount: deptFreelancers.length,
       onProjectCount: onProjectFreelancers.length,
       headcount: deptEmployees.length + deptFreelancers.length,
-      location: department.location || "Kathmandu HQ",
+      location: department.location || "Not specified",
     };
   });
 
@@ -324,6 +488,7 @@ export default function AdminPeople() {
       employeeEmail: employee?.email || "",
       employeeRole: employee?.role || "",
       departmentId: employee?.department?._id || "",
+      managerId: employee?.manager?._id || employee?.manager || "",
     });
     setAssignmentNotice("");
   }
@@ -344,10 +509,48 @@ export default function AdminPeople() {
     setIsDepartmentModalOpen(true);
   }
 
+  function openAddDepartmentModal() {
+    setNewDepartmentName("");
+    setNewDepartmentNotice("");
+    setIsAddDepartmentModalOpen(true);
+  }
+
   function closeDepartmentModal() {
     if (isSavingAssignment) return;
     setIsDepartmentModalOpen(false);
     setAssignmentNotice("");
+  }
+
+  function closeAddDepartmentModal() {
+    if (isSavingDepartment) return;
+    setIsAddDepartmentModalOpen(false);
+    setNewDepartmentNotice("");
+  }
+
+  async function handleAddDepartmentSubmit(event) {
+    event.preventDefault();
+
+    if (!newDepartmentName.trim()) {
+      setNewDepartmentNotice("Department name is required.");
+      return;
+    }
+
+    setIsSavingDepartment(true);
+    setNewDepartmentNotice("");
+
+    try {
+      const result = await departmentApi.create({ name: newDepartmentName.trim() });
+      const createdDepartment = result?.data || result;
+      setDepartments((current) => [createdDepartment, ...current]);
+      setNewDepartmentNotice(`Department "${newDepartmentName.trim()}" added successfully.`);
+      setTimeout(() => {
+        closeAddDepartmentModal();
+      }, 700);
+    } catch (err) {
+      setNewDepartmentNotice(err?.message || "Failed to save department.");
+    } finally {
+      setIsSavingDepartment(false);
+    }
   }
 
   async function handleDepartmentSubmit(event) {
@@ -365,16 +568,23 @@ export default function AdminPeople() {
       const selectedDepartment = departmentOptions.find(
         (d) => d._id === assignment.departmentId
       );
+      const selectedManager = managerOptions.find((m) => (m.userId?._id || m._id) === assignment.managerId);
+      const departmentId = await resolveDepartmentId(assignment.departmentId);
 
       await employeeApi.update(assignment.employeeId, {
-        departmentId: assignment.departmentId || null,
+        departmentId: departmentId || null,
+        ...(assignment.managerId !== undefined ? { manager: assignment.managerId || null } : {}),
       });
 
       // Optimistically update local state
       setEmployees((current) =>
         current.map((emp) =>
           emp._id === assignment.employeeId
-            ? { ...emp, departmentName: selectedDepartment?.name || "Unassigned" }
+            ? {
+                ...emp,
+                departmentName: selectedDepartment?.name || "Unassigned",
+                managerName: selectedManager?.name || emp.managerName || "No manager",
+              }
             : emp
         )
       );
@@ -537,7 +747,14 @@ export default function AdminPeople() {
           <p className="mt-2 text-sm text-slate-500">A combined roster across employees and freelancers.</p>
         </div>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-wrap justify-end gap-3">
+          <button
+            type="button"
+            onClick={openAddPersonModal}
+            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+          >
+            Add Person
+          </button>
           <button
             type="button"
             onClick={() => { setIsMatchModalOpen(true); setMatchResults([]); setMatchError(""); setMatchForm({ projectId: "", description: "", requiredSkills: "" }); }}
@@ -547,10 +764,17 @@ export default function AdminPeople() {
           </button>
           <button
             type="button"
+            onClick={() => openAddDepartmentModal()}
+            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+          >
+            Add Department
+          </button>
+          <button
+            type="button"
             onClick={() => openDepartmentModal()}
             className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
           >
-            Add Department
+            Assign Department
           </button>
         </div>
 
@@ -586,7 +810,7 @@ export default function AdminPeople() {
                 </div>
                 <div className="mt-4 space-y-1 text-sm text-slate-600">
                   <p>Manager: <span className="font-semibold text-slate-800">{department.head?.name || department.manager?.name || "Not assigned"}</span></p>
-                  <p>Location: <span className="font-semibold text-slate-800">{department.location || "Kathmandu HQ"}</span></p>
+                    <p>Location: <span className="font-semibold text-slate-800">{department.location || "Not specified"}</span></p>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <div className="rounded-xl bg-white p-3 shadow-sm">
@@ -610,7 +834,7 @@ export default function AdminPeople() {
                       <div className="mt-2 space-y-1">
                         {department.deptFreelancers.slice(0, 3).map((f) => (
                           <div key={f._id} className="flex items-center gap-1.5">
-                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${(statusOverrides[f._id] || "Available") === "On Project" ? "bg-blue-500" : "bg-emerald-400"}`} />
+                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${getPersonStatus(f) === "On Project" ? "bg-blue-500" : "bg-emerald-400"}`} />
                             <p className="truncate text-[11px] text-slate-500">{f.name}</p>
                           </div>
                         ))}
@@ -656,13 +880,7 @@ export default function AdminPeople() {
                       <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${statusColors[getPersonStatus(person)] || "bg-slate-100 text-slate-600"}`}>
                         {getPersonStatus(person)}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => toggleStatus(person)}
-                        className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
-                      >
-                        {getPersonStatus(person) === "Available" ? "Set On Project" : "Set Available"}
-                      </button>
+                      <span className="text-[11px] font-semibold text-slate-400">Synced from profile</span>
                     </div>
                     <div className="mt-3 flex items-center justify-between text-sm">
                       <span className="text-slate-500">Skills</span>
@@ -913,13 +1131,299 @@ export default function AdminPeople() {
         </div>
       ) : null}
 
+      {isAddPersonModalOpen ? (
+        <div className="fixed inset-0 z-80 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-[28px] border border-slate-200 bg-white p-6 shadow-2xl sm:p-7 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-rose-600">Add New Person</p>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Create an employee or freelancer</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Register a new user account and attach the profile to the people roster.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeAddPersonModal}
+                className="rounded-full bg-slate-100 px-3 py-2 text-xs font-black uppercase tracking-[0.16em] text-slate-500 transition hover:bg-slate-200"
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleAddPersonSubmit} className="mt-6 space-y-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Profile Type</span>
+                  <select
+                    value={personType}
+                    onChange={(e) => {
+                      const type = e.target.value;
+                      setPersonType(type);
+                      setPersonForm((current) => ({
+                        ...current,
+                        roleLabel: type === "EMPLOYEE" ? "Employee" : type === "MANAGER" ? "Manager" : "Freelancer",
+                      }));
+                    }}
+                    className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white"
+                  >
+                    <option value="EMPLOYEE">Employee</option>
+                    <option value="MANAGER">Manager</option>
+                    <option value="FREELANCER">Freelancer</option>
+                  </select>
+                </label>
+
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <label className="block md:col-span-2">
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Full name</span>
+                  <input
+                    type="text"
+                    value={personForm.name}
+                    onChange={(e) => setPersonForm((current) => ({ ...current, name: e.target.value }))}
+                    placeholder="Sita Sharma"
+                    className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white"
+                  />
+                </label>
+                <label className="block md:col-span-1">
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Email</span>
+                  <input
+                    type="email"
+                    value={personForm.email}
+                    onChange={(e) => setPersonForm((current) => ({ ...current, email: e.target.value }))}
+                    placeholder="sita.sharma@example.com"
+                    className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white"
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {personType !== "MANAGER" ? (
+                  <label className="block">
+                    <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Role / Title</span>
+                    <input
+                      type="text"
+                      value={personForm.roleLabel}
+                      onChange={(e) => setPersonForm((current) => ({ ...current, roleLabel: e.target.value }))}
+                      placeholder={personType === "EMPLOYEE" ? "Backend Developer" : "Full Stack Freelancer"}
+                      className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white"
+                    />
+                  </label>
+                ) : (
+                  <div className="hidden md:block" />
+                )}
+
+                {personType !== "FREELANCER" ? (
+                  <>
+                    <label className="block">
+                      <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Department</span>
+                      <select
+                        value={personForm.departmentId}
+                        onChange={(e) => setPersonForm((current) => ({ ...current, departmentId: e.target.value }))}
+                        className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white"
+                      >
+                        <option value="">Unassigned</option>
+                        {departmentOptions.map((department) => (
+                          <option key={department._id} value={department._id}>{department.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    {personType === "EMPLOYEE" ? (
+                      <label className="block">
+                        <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Manager</span>
+                        <select
+                          value={personForm.manager}
+                          onChange={(e) => setPersonForm((current) => ({ ...current, manager: e.target.value }))}
+                          className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white"
+                        >
+                          <option value="">Unassigned</option>
+                          {managerOptions.length ? (
+                            managerOptions.map((manager) => (
+                              <option key={manager._id} value={manager.userId?._id || manager._id}>
+                                {manager.name} ({manager.email})
+                              </option>
+                            ))
+                          ) : (
+                            <option value="" disabled>No managers available yet</option>
+                          )}
+                        </select>
+                      </label>
+                    ) : null}
+                  </>
+                ) : (
+                  <label className="block">
+                    <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Hourly Rate</span>
+                    <input
+                      type="number"
+                      value={personForm.hourlyRate}
+                      onChange={(e) => setPersonForm((current) => ({ ...current, hourlyRate: e.target.value }))}
+                      placeholder="20"
+                      className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white"
+                    />
+                  </label>
+                )}
+              </div>
+
+              {personType === "EMPLOYEE" ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Designation</span>
+                    <input
+                      type="text"
+                      value={personForm.designation}
+                      onChange={(e) => setPersonForm((current) => ({ ...current, designation: e.target.value }))}
+                      placeholder="Senior Engineer"
+                      className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Employee code</span>
+                    <input
+                      type="text"
+                      value={personForm.employeeCode}
+                      onChange={(e) => setPersonForm((current) => ({ ...current, employeeCode: e.target.value }))}
+                      placeholder="EMP-1234"
+                      className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <div>
+                  <label className="block">
+                    <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Skills</span>
+                    <input
+                      type="text"
+                      value={personForm.skills}
+                      onChange={(e) => setPersonForm((current) => ({ ...current, skills: e.target.value }))}
+                      placeholder="React, Node.js, MongoDB"
+                      className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white"
+                    />
+                  </label>
+                </div>
+              )}
+
+
+              {personType === "FREELANCER" ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">GitHub URL</span>
+                    <input
+                      type="url"
+                      value={personForm.portfolioUrl}
+                      onChange={(e) => setPersonForm((current) => ({ ...current, portfolioUrl: e.target.value }))}
+                      placeholder="https://github.com/username"
+                      className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Timezone</span>
+                    <input
+                      type="text"
+                      value={personForm.timezone}
+                      onChange={(e) => setPersonForm((current) => ({ ...current, timezone: e.target.value }))}
+                      placeholder="UTC+5:45"
+                      className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white"
+                    />
+                  </label>
+                </div>
+              ) : null}
+
+              {personNotice ? (
+                <div className={`rounded-2xl px-4 py-3 text-sm font-medium ${personNotice.toLowerCase().includes("failed") || personNotice.toLowerCase().includes("required") ? "border border-amber-200 bg-amber-50 text-amber-800" : "border border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+                  {personNotice}
+                </div>
+              ) : null}
+
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeAddPersonModal}
+                  disabled={isSavingPerson}
+                  className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingPerson}
+                  className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSavingPerson ? "Adding Person..." : "Save Person"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {isAddDepartmentModalOpen ? (
+        <div className="fixed inset-0 z-80 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white p-6 shadow-2xl sm:p-7">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-rose-600">New Department</p>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Add a department</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Create a new department so it appears in the people and assignment selectors.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { if (!isSavingDepartment) setIsAddDepartmentModalOpen(false); }}
+                className="rounded-full bg-slate-100 px-3 py-2 text-xs font-black uppercase tracking-[0.16em] text-slate-500 transition hover:bg-slate-200"
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleAddDepartmentSubmit} className="mt-6 space-y-5">
+              <label className="block">
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Department name</span>
+                <input
+                  type="text"
+                  value={newDepartmentName}
+                  onChange={(e) => setNewDepartmentName(e.target.value)}
+                  placeholder="e.g. Research & Development"
+                  className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white"
+                />
+              </label>
+
+              {newDepartmentNotice ? (
+                <div className={`rounded-2xl px-4 py-3 text-sm font-medium ${newDepartmentNotice.toLowerCase().includes("failed") || newDepartmentNotice.toLowerCase().includes("required") ? "border border-amber-200 bg-amber-50 text-amber-800" : "border border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+                  {newDepartmentNotice}
+                </div>
+              ) : null}
+
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => { if (!isSavingDepartment) setIsAddDepartmentModalOpen(false); }}
+                  disabled={isSavingDepartment}
+                  className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingDepartment}
+                  className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSavingDepartment ? "Saving..." : "Save Department"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
       {isDepartmentModalOpen ? (
         <div className="fixed inset-0 z-80 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
           <div className="w-full max-w-2xl rounded-[28px] border border-slate-200 bg-white p-6 shadow-2xl sm:p-7">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.18em] text-rose-600">Department Assignment</p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Add department details</h2>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Assign department details</h2>
                 <p className="mt-2 text-sm text-slate-500">
                   Choose the employee, assign the department, review the related details, and save the change.
                 </p>
@@ -964,6 +1468,25 @@ export default function AdminPeople() {
                         {department.name}
                       </option>
                     ))}
+                  </select>
+                </label>
+                <label className="block md:col-span-2">
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Manager</span>
+                  <select
+                    value={assignment.managerId}
+                    onChange={(event) => setAssignment((current) => ({ ...current, managerId: event.target.value }))}
+                    className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white"
+                  >
+                    <option value="">Unassigned</option>
+                    {managerOptions.length ? (
+                      managerOptions.map((manager) => (
+                        <option key={manager._id} value={manager.userId?._id || manager._id}>
+                          {manager.name} ({manager.email})
+                        </option>
+                      ))
+                    ) : (
+                      <option value="" disabled>No managers available</option>
+                    )}
                   </select>
                 </label>
               </div>

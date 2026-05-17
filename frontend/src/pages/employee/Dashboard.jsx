@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { createElement, useState, useEffect } from "react";
 import EmployeeLayout from "../../layouts/EmployeeLayout";
 import { analyticsApi, attendanceApi } from "../../services/api";
 import {
@@ -13,25 +13,29 @@ import {
   ShieldCheck
 } from "lucide-react";
 
-const StatCard = ({ label, value, sub, icon, color }) => (
-  <div className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md">
-    <div className="mb-4 flex items-start justify-between">
-      <div className={`rounded-xl p-3 ${color} bg-opacity-10 transition-transform group-hover:scale-110 group-hover:rotate-3`}>
-        {icon({ size: 22, className: color.replace("bg-", "text-") })}
+const StatCard = ({ label, value, sub, icon, color }) => {
+  const iconColor = color.replace("bg-", "text-");
+
+  return (
+    <div className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md">
+      <div className="mb-4 flex items-start justify-between">
+        <div className={`rounded-xl p-3 ${color} bg-opacity-10 transition-transform group-hover:scale-110 group-hover:rotate-3`}>
+          {createElement(icon, { size: 22, className: iconColor })}
+        </div>
+        <div className="flex items-center gap-1 text-slate-300 transition-colors group-hover:text-blue-500">
+          <span className="text-[10px] font-bold uppercase tracking-tighter">View Details</span>
+          <ArrowUpRight size={14} />
+        </div>
       </div>
-      <div className="flex items-center gap-1 text-slate-300 transition-colors group-hover:text-blue-500">
-        <span className="text-[10px] font-bold uppercase tracking-tighter">View Details</span>
-        <ArrowUpRight size={14} />
+      <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-400">{label}</p>
+      <div className="mt-1 flex items-baseline gap-2">
+        <p className="text-3xl font-black tracking-tight text-slate-800">{value}</p>
+        {sub ? <p className="text-xs font-medium text-slate-400">{sub}</p> : null}
       </div>
+      <div className={`absolute bottom-0 left-0 h-1 w-0 transition-all duration-500 group-hover:w-full ${color}`} />
     </div>
-    <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-400">{label}</p>
-    <div className="mt-1 flex items-baseline gap-2">
-      <p className="text-3xl font-black tracking-tight text-slate-800">{value}</p>
-      {sub ? <p className="text-xs font-medium text-slate-400">{sub}</p> : null}
-    </div>
-    <div className={`absolute bottom-0 left-0 h-1 w-0 transition-all duration-500 group-hover:w-full ${color}`} />
-  </div>
-);
+  );
+};
 
 export default function EmployeeDashboard() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");

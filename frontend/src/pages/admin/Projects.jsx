@@ -3,23 +3,6 @@ import AdminLayout from "../../layouts/AdminLayout";
 import { departmentApi, projectApi } from "../../services/api";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 
-const MANUAL_PROJECTS_STORAGE_KEY = "admin_projects_manual_projects";
-
-const defaultDepartmentOptions = [
-  { _id: "default-backend", name: "Backend Department" },
-  { _id: "default-frontend", name: "Frontend Department" },
-  { _id: "default-fullstack", name: "Full Stack Department" },
-  { _id: "default-mobile", name: "Mobile App Department" },
-  { _id: "default-devops", name: "DevOps Department" },
-  { _id: "default-qa", name: "QA Department" },
-  { _id: "default-uiux", name: "UI/UX Department" },
-  { _id: "default-product", name: "Product Department" },
-  { _id: "default-hr", name: "HR Department" },
-  { _id: "default-finance", name: "Finance Department" },
-  { _id: "default-operations", name: "Operations Department" },
-];
-
-const statusOptions = ["ACTIVE", "COMPLETED", "ON_HOLD", "CANCELLED"];
 const priorityOptions = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
 function progressTone(progress) {
@@ -27,32 +10,6 @@ function progressTone(progress) {
   if (progress >= 50) return "bg-blue-500";
   if (progress >= 25) return "bg-amber-500";
   return "bg-rose-500";
-}
-
-function readManualProjects() {
-  try {
-    const stored = localStorage.getItem(MANUAL_PROJECTS_STORAGE_KEY);
-    const parsed = stored ? JSON.parse(stored) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function mergeProjects(baseProjects, manualProjects) {
-  const merged = new Map();
-
-  baseProjects.forEach((project) => {
-    const key = String(project.code || project._id || project.name || "").trim().toLowerCase();
-    merged.set(key, project);
-  });
-
-  manualProjects.forEach((project) => {
-    const key = String(project.code || project._id || project.name || "").trim().toLowerCase();
-    merged.set(key, project);
-  });
-
-  return Array.from(merged.values());
 }
 
 function createEmptyForm() {
@@ -66,7 +23,6 @@ function createEmptyForm() {
     startDate: "",
     deadline: "",
     budget: "",
-    status: "ACTIVE",
     priority: "MEDIUM",
     averageUtilization: "",
     employeeCount: "",
@@ -78,7 +34,6 @@ function createEmptyForm() {
 export default function AdminProjects() {
   const [projects, setProjects] = useState([]);
   const [departments, setDepartments] = useState([]);
-  const [manualProjects, setManualProjects] = useState(() => readManualProjects());
   const [error, setError] = useState("");
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isSavingProject, setIsSavingProject] = useState(false);
@@ -110,7 +65,7 @@ export default function AdminProjects() {
               : departmentData.value?.data || []
             : [];
 
-        setProjects(mergeProjects(projectList, manualProjects));
+        setProjects(projectList);
         setDepartments(departmentList);
 
         if (projectData.status === "rejected" && departmentData.status === "rejected") {
@@ -125,22 +80,9 @@ export default function AdminProjects() {
     return () => {
       active = false;
     };
-  }, [manualProjects]);
+  }, []);
 
-  useEffect(() => {
-    localStorage.setItem(MANUAL_PROJECTS_STORAGE_KEY, JSON.stringify(manualProjects));
-  }, [manualProjects]);
-
-  const departmentOptions = [
-    ...departments,
-    ...defaultDepartmentOptions.filter(
-      (defaultDepartment) =>
-        !departments.some(
-          (department) =>
-            String(department.name || "").trim().toLowerCase() === defaultDepartment.name.toLowerCase()
-        )
-    ),
-  ];
+  const departmentOptions = departments;
 
   function openProjectModal() {
     setForm(createEmptyForm());
@@ -161,8 +103,24 @@ export default function AdminProjects() {
   async function handleProjectSubmit(event) {
     event.preventDefault();
 
-    if (!form.name.trim() || !form.code.trim() || !form.deadline || !form.ownerName.trim()) {
-      setProjectNotice("Enter the project name, code, owner, and deadline first.");
+    const startDate = form.startDate || new Date().toISOString().slice(0, 10);
+    if (!form.name.trim() || !form.code.trim() || !form.deadline) {
+      setProjectNotice("Enter the project name, code, and deadline first.");
+      return;
+    }
+
+    if (form.deadline < startDate) {
+      setProjectNotice("Deadline cannot be earlier than the start date.");
+      return;
+    }
+
+    if (Number(form.budget || 0) < 0) {
+      setProjectNotice("Budget cannot be negative.");
+      return;
+    }
+
+    if (Number(form.averageUtilization || 0) < 0 || Number(form.averageUtilization || 0) > 100) {
+      setProjectNotice("Utilization target must be between 0 and 100.");
       return;
     }
 
@@ -170,56 +128,33 @@ export default function AdminProjects() {
     setProjectNotice("");
 
     try {
-      const selectedDepartment = departmentOptions.find((department) => department._id === form.departmentId);
-      const manualProject = {
-        _id: `manual-project-${Date.now()}`,
+      const payload = {
         code: form.code.trim().toUpperCase(),
         name: form.name.trim(),
-        description: form.description.trim(),
-        clientName: form.clientName.trim() || "Workforce360",
-        department: selectedDepartment ? { _id: selectedDepartment._id, name: selectedDepartment.name } : null,
-        ownerManager: form.ownerName.trim() ? { name: form.ownerName.trim() } : null,
-        manager: form.ownerName.trim() ? { name: form.ownerName.trim() } : null,
-        startDate: form.startDate || new Date().toISOString().slice(0, 10),
+        description: form.description.trim() || undefined,
+        clientName: form.clientName.trim() || undefined,
+        department: form.departmentId || undefined,
+        startDate,
         deadline: form.deadline,
         budget: Number(form.budget || 0),
-        status: form.status,
         priority: form.priority,
+        utilizationTarget: Number(form.averageUtilization || 75),
         requiredSkills: form.requiredSkills
           .split(",")
           .map((skill) => skill.trim())
           .filter(Boolean),
-        summary: {
-          averageUtilization: Number(form.averageUtilization || 0),
-          utilizationFormula: "completed_tasks / total_tasks * 100",
-          employeeCount: Number(form.employeeCount || 0),
-          freelancerCount: Number(form.freelancerCount || 0),
-        },
-        employees: Array.from({ length: Number(form.employeeCount || 0) }),
-        freelancers: Array.from({ length: Number(form.freelancerCount || 0) }),
       };
 
-      setManualProjects((current) => {
-        const next = [...current];
-        const existingIndex = next.findIndex(
-          (project) => String(project.code || "").trim().toLowerCase() === manualProject.code.toLowerCase()
-        );
-
-        if (existingIndex >= 0) {
-          next[existingIndex] = { ...next[existingIndex], ...manualProject };
-        } else {
-          next.unshift(manualProject);
-        }
-
-        return next;
-      });
-
-      setProjects((current) => mergeProjects(current, [manualProject]));
-      setProjectNotice(`Project saved for ${manualProject.name}.`);
+      const response = await projectApi.create(payload);
+      const createdProject = response?.project || response;
+      setProjects((current) => [createdProject, ...current]);
+      setProjectNotice(`Project created for ${createdProject.name || payload.name}.`);
       setTimeout(() => {
         setIsProjectModalOpen(false);
         setProjectNotice("");
       }, 700);
+    } catch (err) {
+      setProjectNotice(err.message || "Unable to create project.");
     } finally {
       setIsSavingProject(false);
     }
@@ -348,7 +283,7 @@ export default function AdminProjects() {
                 <p className="text-[11px] font-black uppercase tracking-[0.18em] text-rose-600">Project Setup</p>
                 <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Add project details</h2>
                 <p className="mt-2 text-sm text-slate-500">
-                  Fill in the project information shown in the admin project cards and save it to display instantly.
+                  Create a live project record. Staffing and status changes should be managed after the project exists.
                 </p>
               </div>
               <button
@@ -407,7 +342,7 @@ export default function AdminProjects() {
                 />
               </label>
 
-              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 <label className="block">
                   <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Department</span>
                   <select
@@ -425,29 +360,15 @@ export default function AdminProjects() {
                 </label>
 
                 <label className="block">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Owner</span>
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Owner Note</span>
                   <input
                     type="text"
                     value={form.ownerName}
                     onChange={(event) => updateForm("ownerName", event.target.value)}
-                    placeholder="Enter owner name"
+                    placeholder="Assigned to current admin on save"
+                    disabled
                     className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-rose-300 focus:bg-white"
                   />
-                </label>
-
-                <label className="block">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Status</span>
-                  <select
-                    value={form.status}
-                    onChange={(event) => updateForm("status", event.target.value)}
-                    className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white"
-                  >
-                    {statusOptions.map((status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
-                    ))}
-                  </select>
                 </label>
 
                 <label className="block">
@@ -514,31 +435,7 @@ export default function AdminProjects() {
               </div>
 
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                <label className="block">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Employee Count</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.employeeCount}
-                    onChange={(event) => updateForm("employeeCount", event.target.value)}
-                    placeholder="0"
-                    className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-rose-300 focus:bg-white"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Freelancer Count</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.freelancerCount}
-                    onChange={(event) => updateForm("freelancerCount", event.target.value)}
-                    placeholder="0"
-                    className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-rose-300 focus:bg-white"
-                  />
-                </label>
-
-                <label className="block">
+                <label className="block xl:col-span-3">
                   <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Skills</span>
                   <input
                     type="text"
@@ -551,7 +448,7 @@ export default function AdminProjects() {
               </div>
 
               {projectNotice ? (
-                <div className={`rounded-2xl px-4 py-3 text-sm font-medium ${projectNotice.toLowerCase().includes("enter") || projectNotice.toLowerCase().includes("select") ? "border border-amber-200 bg-amber-50 text-amber-800" : "border border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+                <div className={`rounded-2xl px-4 py-3 text-sm font-medium ${projectNotice.toLowerCase().includes("enter") || projectNotice.toLowerCase().includes("select") || projectNotice.toLowerCase().includes("cannot") || projectNotice.toLowerCase().includes("unable") ? "border border-amber-200 bg-amber-50 text-amber-800" : "border border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
                   {projectNotice}
                 </div>
               ) : null}

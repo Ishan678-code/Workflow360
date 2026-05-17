@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createElement, useEffect, useState } from "react";
 import EmployeeLayout from "../../layouts/EmployeeLayout";
 import { 
   FileText, 
@@ -15,7 +15,7 @@ const SummaryCard = ({ label, amount, icon, color, bg }) => (
   <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex flex-col justify-between h-32">
     <div className="flex justify-between items-start">
       <div className={`p-2.5 rounded-xl ${bg} ${color}`}>
-        {icon({ size: 20 })}
+        {createElement(icon, { size: 20 })}
       </div>
       <TrendingUp size={16} className="text-slate-300" />
     </div>
@@ -31,6 +31,7 @@ const StatusBadge = ({ status }) => {
   const styles = {
     Paid: "bg-emerald-50 text-emerald-600 border-emerald-100",
     Processing: "bg-orange-50 text-orange-600 border-orange-100",
+    Generated: "bg-blue-50 text-blue-600 border-blue-100",
   };
   return (
     <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider border ${styles[status] || styles.Processing}`}>
@@ -40,10 +41,8 @@ const StatusBadge = ({ status }) => {
 };
 
 export default function ViewPayslip() {
-  const [payslips, setPayslips] = useState([
-    { period: "March 2026", gross: "NPR 8,500.00", deduct: "NPR 1,850.00", net: "NPR 6,650.00", status: "Processing" },
-    { period: "February 2026", gross: "NPR 8,500.00", deduct: "NPR 1,850.00", net: "NPR 6,650.00", status: "Paid" },
-  ]);
+  const [payslips, setPayslips] = useState([]);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -53,18 +52,19 @@ export default function ViewPayslip() {
         const data = await payrollApi.getMine();
         if (!active) return;
         const rows = Array.isArray(data) ? data : data?.data || [];
-        if (!rows.length) return;
         setPayslips(rows.map((item) => ({
           id: item._id,
           period: formatMonthLabel(item.month),
           gross: formatCurrency(item.grossSalary || 0),
           deduct: formatCurrency(item.deductions || 0),
           net: formatCurrency(item.netSalary || 0),
-          status: item.month === rows[0]?.month ? "Processing" : "Paid",
+          status: item.status === "GENERATED" ? "Generated" : item.status || "Paid",
           departmentName: item.employee?.department?.name || "Unassigned",
           designationTitle: item.employee?.designation?.title || "Role pending",
         })));
-      } catch {}
+      } catch (err) {
+        if (active) setError(err.message || "Unable to load payslips.");
+      }
     }
 
     loadPayslips();
@@ -123,6 +123,12 @@ export default function ViewPayslip() {
           </div>
         </div>
 
+        {error ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+            {error}
+          </div>
+        ) : null}
+
         {/* Payslip History Table */}
         <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
           <div className="p-6 border-b border-slate-50 flex justify-between items-center">
@@ -147,7 +153,7 @@ export default function ViewPayslip() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {payslips.map((item, idx) => (
+                {payslips.length ? payslips.map((item, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-6 py-5">
                       <span className="text-[13px] font-bold text-slate-700">{item.period}</span>
@@ -166,8 +172,10 @@ export default function ViewPayslip() {
                           if (!item.id) return;
                           try {
                             const blob = await payrollApi.downloadPayslip(item.id);
-                            downloadBlob(blob, `payslip-Rs.{item.period}.pdf`);
-                          } catch {}
+                            downloadBlob(blob, `payslip-${item.period}.pdf`);
+                          } catch (err) {
+                            setError(err.message || "Unable to download payslip.");
+                          }
                         }}
                         className="inline-flex items-center gap-2 text-slate-400 hover:text-blue-600 transition-colors"
                       >
@@ -176,7 +184,13 @@ export default function ViewPayslip() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan="8" className="px-6 py-12 text-center text-sm text-slate-400">
+                      No payslips are available yet.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

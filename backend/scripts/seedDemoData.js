@@ -1,4 +1,4 @@
-import dotenv from "dotenv";
+﻿import dotenv from "dotenv";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import User from "../models/User.js";
@@ -18,12 +18,12 @@ import PerformanceReview from "../models/Performance.js";
 dotenv.config();
 
 const DEMO_USERS = [
-  { name: "Admin User", email: "admin@company.com", password: "admin123", role: "ADMIN" },
-  { name: "Maya Manager", email: "manager@company.com", password: "manager123", role: "MANAGER" },
-  { name: "Ethan Employee", email: "employee@company.com", password: "employee123", role: "EMPLOYEE" },
-  { name: "Nina Employee", email: "employee2@company.com", password: "employee123", role: "EMPLOYEE" },
-  { name: "Felix Freelancer", email: "freelancer@company.com", password: "freelancer123", role: "FREELANCER" },
-  { name: "Priya Freelancer", email: "freelancer2@company.com", password: "freelancer123", role: "FREELANCER" },
+  { name: "Raj Kumar Shrestha", email: "admin@company.com", password: "admin123", role: "ADMIN" },
+  { name: "Anita Kumari Poudel", email: "manager@company.com", password: "manager123", role: "MANAGER" },
+  { name: "Sunil Prasad Maharjan", email: "employee@company.com", password: "employee123", role: "EMPLOYEE" },
+  { name: "Deepa Laxmi Shrestha", email: "employee2@company.com", password: "employee123", role: "EMPLOYEE" },
+  { name: "Rohan Singh Gurung", email: "freelancer@company.com", password: "freelancer123", role: "FREELANCER" },
+  { name: "Priya Kumari Tamang", email: "freelancer2@company.com", password: "freelancer123", role: "FREELANCER" },
 ];
 
 async function upsertUser(definition) {
@@ -93,7 +93,7 @@ async function main() {
       salary: 8500,
       joiningDate: new Date("2025-04-08"),
       phone: "+9779800000001",
-      emergencyContact: "Arjun Employee",
+      emergencyContact: "Ganga Devi Shrestha",
     },
     { new: true, upsert: true }
   );
@@ -107,7 +107,7 @@ async function main() {
       salary: 7800,
       joiningDate: new Date("2025-07-15"),
       phone: "+9779800000002",
-      emergencyContact: "Sara Employee",
+      emergencyContact: "Ram Bahadur Poudel",
     },
     { new: true, upsert: true }
   );
@@ -118,7 +118,7 @@ async function main() {
       userId: freelancerUser._id,
       hourlyRate: 55,
       skills: ["React", "Vite", "Tailwind CSS"],
-      portfolioUrl: "https://portfolio.example/felix",
+      portfolioUrl: "https://portfolio.example/rohangurung",
       timezone: "Asia/Kathmandu",
     },
     { new: true, upsert: true }
@@ -129,7 +129,7 @@ async function main() {
       userId: freelancerTwoUser._id,
       hourlyRate: 48,
       skills: ["Figma", "UI Design", "Design Systems"],
-      portfolioUrl: "https://portfolio.example/priya",
+      portfolioUrl: "https://portfolio.example/priyatamang",
       timezone: "Asia/Kolkata",
     },
     { new: true, upsert: true }
@@ -397,3 +397,5 @@ main()
     await mongoose.disconnect();
     process.exit(1);
   });
+
+

@@ -1,4 +1,3 @@
-
 import dotenv from "dotenv";
 dotenv.config();
 import express from "express";
@@ -10,7 +9,10 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { initSocket } from "./services/socketService.js";
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: process.env.CLIENT_BASE_URL,
+  credentials: true
+}));
 app.use(express.json());
 
 app.use("/api", router);

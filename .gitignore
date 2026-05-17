@@ -1,6 +1,6 @@
 .env
+frontend/.env
 frontend/.env.local
+backend/.env
 backend/.env.local
 node_modules
-
-frontend/.env

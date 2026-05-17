@@ -104,7 +104,32 @@ This repository is a monorepo with the frontend in `frontend/` and backend in `b
    ```
 3. Do not commit `frontend/.env`.
 
-> Note: The backend is not configured for Vercel serverless functions, so deploy the Express/MongoDB API separately on a Node-capable host (Render, Railway, Heroku, etc.).
+### Backend deployment
+
+The backend should be deployed separately on a Node-capable host.
+
+Recommended hosts:
+- Render
+- Railway
+- Heroku
+- Fly
+- Azure App Service
+
+For backend deployment:
+1. Deploy from the `backend/` folder.
+2. Use `npm install` to install dependencies.
+3. Use `npm start` to run the server.
+4. Set these environment variables on the host:
+   - `MONGO_URI`
+   - `JWT_SECRET`
+   - `PORT` (optional)
+
+Example production `VITE_API_BASE_URL` for Vercel:
+```text
+https://your-backend-domain.com/api
+```
+
+> Note: The backend is not configured for Vercel serverless functions, so keep it on a separate Node host.
 
 
 

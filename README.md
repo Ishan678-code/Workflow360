@@ -87,5 +87,24 @@ This project demonstrates practical skills in building a complete web applicatio
 - The frontend uses React Router for role-based routing and protected pages.
 - The project is structured to keep controllers, routes, and models separate for easier maintenance and scaling.
 
+## Vercel Deployment
+
+This repository is a monorepo with the frontend in `frontend/` and backend in `backend/`.
+
+- The frontend can be deployed to Vercel using the `frontend` folder as the project root.
+- A `vercel.json` file is included to set the root directory to `frontend` and to support client-side routing.
+- Set the Vercel environment variable `VITE_API_BASE_URL` to your backend API URL, for example `https://example-backend.com/api`.
+
+### Local frontend env setup
+
+1. Copy `frontend/.env.example` to `frontend/.env`.
+2. Set:
+   ```env
+   VITE_API_BASE_URL=http://localhost:5000/api
+   ```
+3. Do not commit `frontend/.env`.
+
+> Note: The backend is not configured for Vercel serverless functions, so deploy the Express/MongoDB API separately on a Node-capable host (Render, Railway, Heroku, etc.).
+
 
 

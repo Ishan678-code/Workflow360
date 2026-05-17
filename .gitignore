@@ -1,2 +1,6 @@
 .env
+frontend/.env.local
+backend/.env.local
 node_modules
+
+frontend/.env

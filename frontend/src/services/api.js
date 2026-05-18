@@ -173,9 +173,11 @@ export const invoiceApi = {
     return request(`/invoices${params}`);
   },
   getById: (id) => request(`/invoices/${id}`),
+  downloadInvoicePDF: (id) => requestBlob(`/invoices/${id}/pdf`),
   updateStatus: (id, status) =>
     request(`/invoices/${id}/status`, { method: "PUT", body: JSON.stringify({ status }) }),
 };
+
 
 // ── Payroll ───────────────────────────────────────────────────────────────────
 export const payrollApi = {

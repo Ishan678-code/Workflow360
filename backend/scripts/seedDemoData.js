@@ -18,12 +18,12 @@ import PerformanceReview from "../models/Performance.js";
 dotenv.config();
 
 const DEMO_USERS = [
-  { name: "Raj Kumar Shrestha", email: "admin@company.com", password: "admin123", role: "ADMIN" },
-  { name: "Anita Kumari Poudel", email: "manager@company.com", password: "manager123", role: "MANAGER" },
-  { name: "Sunil Prasad Maharjan", email: "employee@company.com", password: "employee123", role: "EMPLOYEE" },
-  { name: "Deepa Laxmi Shrestha", email: "employee2@company.com", password: "employee123", role: "EMPLOYEE" },
-  { name: "Rohan Singh Gurung", email: "freelancer@company.com", password: "freelancer123", role: "FREELANCER" },
-  { name: "Priya Kumari Tamang", email: "freelancer2@company.com", password: "freelancer123", role: "FREELANCER" },
+  { name: "Ram Sharma", email: "admin@company.com", password: "admin123", role: "ADMIN" },
+  { name: "Hari KC", email: "manager@company.com", password: "manager123", role: "MANAGER" },
+  { name: "Sita Thapa", email: "employee@company.com", password: "employee123", role: "EMPLOYEE" },
+  { name: "Gita Gurung", email: "employee2@company.com", password: "employee123", role: "EMPLOYEE" },
+  { name: "Bikash Rai", email: "freelancer@company.com", password: "freelancer123", role: "FREELANCER" },
+  { name: "Prakash Paudel", email: "freelancer2@company.com", password: "freelancer123", role: "FREELANCER" },
 ];
 
 async function upsertUser(definition) {
@@ -230,6 +230,7 @@ async function main() {
       type: "VACATION",
       from: new Date("2026-03-28"),
       to: new Date("2026-03-30"),
+      totalDays: 3,
       reason: "Family trip",
       status: "PENDING",
     },
@@ -238,6 +239,7 @@ async function main() {
       type: "SICK",
       from: new Date("2026-03-12"),
       to: new Date("2026-03-12"),
+      totalDays: 1,
       reason: "Medical appointment",
       status: "APPROVED",
       approvedBy: managerUser._id,
@@ -397,5 +399,3 @@ main()
     await mongoose.disconnect();
     process.exit(1);
   });
-
-

@@ -1,11 +1,30 @@
 import { useEffect, useState } from "react";
 import FreelancerLayout from "../../layouts/FreelancerLayout";
 import { invoiceApi } from "../../services/api";
-import { formatCurrency, formatDate } from "../../utils/formatters";
+import { downloadBlob, formatCurrency, formatDate } from "../../utils/formatters";
 
 export default function FreelancerInvoices() {
   const [invoices, setInvoices] = useState([]);
+  const [downloadingId, setDownloadingId] = useState(null);
   const [error, setError] = useState("");
+
+  async function handleDownloadInvoicePDF(invoice) {
+    const invoiceId = invoice?._id;
+    if (!invoiceId) return;
+
+    try {
+      setError("");
+      setDownloadingId(invoiceId);
+      const blob = await invoiceApi.downloadInvoicePDF(invoiceId);
+      const invoiceNumber = invoice?.invoiceNumber || invoice?.number || invoiceId.slice(-6).toUpperCase();
+      downloadBlob(blob, `invoice-${invoiceNumber}.pdf`);
+    } catch (err) {
+      setError(err.message || "Unable to download invoice PDF.");
+    } finally {
+      setDownloadingId(null);
+    }
+  }
+
 
   useEffect(() => {
     let active = true;
@@ -61,7 +80,19 @@ export default function FreelancerInvoices() {
                   <span className="text-slate-500">Amount</span>
                   <span className="font-semibold text-slate-800">{formatCurrency(invoice.amount || invoice.totalAmount || 0)}</span>
                 </div>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadInvoicePDF(invoice)}
+                    disabled={downloadingId === String(invoice._id)}
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    {downloadingId === String(invoice._id) ? "Downloading..." : "Download PDF"}
+                  </button>
+                </div>
               </div>
+
             </article>
           )) : (
             <div className="rounded-3xl border border-slate-100 bg-white px-4 py-12 text-center text-sm text-slate-400 shadow-sm md:col-span-2">

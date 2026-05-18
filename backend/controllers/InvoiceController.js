@@ -3,8 +3,8 @@ import Timesheet from "../models/Timesheet.js";
 import Freelancer from "../models/Freelancer.js";
 import Project from "../models/Project.js";
 import { getFreelancerProfileByUserId } from "../utils/profileRefs.js";
-
 async function canManageProject(user, projectId) {
+
   if (user.role === "ADMIN") return true;
   const project = await Project.findById(projectId).select("manager ownerManager");
   if (!project) return false;
@@ -138,6 +138,7 @@ export const updateInvoiceStatus = async (req, res) => {
     const { status } = req.body;
 
     const validStatuses = ["PENDING", "PAID", "CANCELLED"];
+
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
     }

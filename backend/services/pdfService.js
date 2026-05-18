@@ -214,6 +214,9 @@ export async function generateAttendanceReportPDF(records, summary, empName = "E
  */
 export async function generatePerformanceReportPDF(insights, userName = "User") {
   const doc    = createDoc();
+
+  // (invoice PDF generator is implemented below this function)
+
   const finish = bufferFromDoc(doc);
 
   header(

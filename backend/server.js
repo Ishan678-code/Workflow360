@@ -26,8 +26,23 @@ const server = http.createServer(app);
 initSocket(server);
 
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB connected"))
+  .then(async () => {
+    console.log("MongoDB connected");
+
+    // Optional: seed demo data automatically (for empty DBs / demos)
+if (process.env.SEED_DEMO_DATA === "true") {
+      try {
+        console.log("SEED_DEMO_DATA=true => running demo seed...");
+        const { default: runSeed } = await import("./scripts/seedDemoDataRunner.js");
+        await runSeed();
+        console.log("Demo seed completed.");
+      } catch (seedErr) {
+        console.error("Demo seed failed:", seedErr?.message || seedErr);
+      }
+    }
+  })
   .catch((err) => console.error("MongoDB connection error:", err));
+
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {

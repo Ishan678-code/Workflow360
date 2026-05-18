@@ -77,7 +77,11 @@ export default function FreelancerTasks() {
     }
   }
 
-  const displayedTasks = viewMode === "priority" ? prioritizedTasks : tasks;
+  const normalizedStatusFilter = String(statusFilter || "IN_PROGRESS").toUpperCase();
+  const displayedTasks = viewMode === "priority"
+    ? (prioritizedTasks || []).filter((t) => String(t.status || "TODO").toUpperCase() === normalizedStatusFilter)
+    : tasks;
+
 
   return (
     <FreelancerLayout>
@@ -128,22 +132,20 @@ export default function FreelancerTasks() {
             AI Priority View
           </button>
 
-          {/* Status Filter (Standard View only) */}
+          {/* Status Filter (Works in both views) */}
           <div className="ml-2 flex items-center gap-2">
             <label className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Status</label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              disabled={viewMode !== "standard"}
-              className={`rounded-full border border-slate-200 px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] transition ${
-                viewMode !== "standard" ? "bg-slate-50 text-slate-400 cursor-not-allowed" : "bg-white hover:bg-slate-50"
-              }`}
+              className={`rounded-full border border-slate-200 px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] transition bg-white hover:bg-slate-50`}
             >
               <option value="IN_PROGRESS">In Progress</option>
               <option value="COMPLETED">Completed</option>
             </select>
           </div>
         </div>
+
 
 
         {/* Loading */}

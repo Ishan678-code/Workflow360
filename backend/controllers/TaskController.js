@@ -100,8 +100,15 @@ export const getTasksByProject = async (req, res) => {
 
 export const getMyTasks = async (req, res) => {
   try {
+    const { includeCompleted } = req.query;
+    const shouldIncludeCompleted = String(includeCompleted).toLowerCase() === "true";
+
+    const statusFilter = shouldIncludeCompleted
+      ? {}
+      : { status: { $ne: "COMPLETED" } };
+
     const tasks = await Task
-      .find({ assignee: req.user.id, status: { $ne: "COMPLETED" } })
+      .find({ assignee: req.user.id, ...statusFilter })
       .populate("project", "name deadline")
       .sort({ deadline: 1 });
 
@@ -110,6 +117,7 @@ export const getMyTasks = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 export const updateTaskStatus = async (req, res) => {
   try {

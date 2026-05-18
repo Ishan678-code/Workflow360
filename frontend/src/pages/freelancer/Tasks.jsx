@@ -18,17 +18,19 @@ export default function FreelancerTasks() {
   const [loadingPriority, setLoadingPriority] = useState(false);
   const [downloadingReport, setDownloadingReport] = useState(false);
   const [error, setError] = useState("");
+  const [statusFilter, setStatusFilter] = useState("IN_PROGRESS"); // IN_PROGRESS | COMPLETED
 
   useEffect(() => {
     let active = true;
 
     async function loadTasks() {
       try {
-        const data = await taskApi.getMyTasks();
+        const data = await taskApi.getMyTasks({ includeCompleted: statusFilter === "COMPLETED" });
         if (!active) return;
         setTasks(Array.isArray(data) ? data : data?.data || []);
       } catch (err) {
         if (active) setError(err.message || "Unable to load tasks.");
+        setTasks([]);
       }
     }
 
@@ -36,7 +38,8 @@ export default function FreelancerTasks() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [statusFilter]);
+
 
   async function loadPrioritizedView() {
     setLoadingPriority(true);
@@ -124,7 +127,24 @@ export default function FreelancerTasks() {
           >
             AI Priority View
           </button>
+
+          {/* Status Filter (Standard View only) */}
+          <div className="ml-2 flex items-center gap-2">
+            <label className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              disabled={viewMode !== "standard"}
+              className={`rounded-full border border-slate-200 px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] transition ${
+                viewMode !== "standard" ? "bg-slate-50 text-slate-400 cursor-not-allowed" : "bg-white hover:bg-slate-50"
+              }`}
+            >
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="COMPLETED">Completed</option>
+            </select>
+          </div>
         </div>
+
 
         {/* Loading */}
         {viewMode === "priority" && loadingPriority ? (

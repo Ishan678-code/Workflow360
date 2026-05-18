@@ -128,7 +128,11 @@ export const taskApi = {
     const params = new URLSearchParams(filters);
     return request(`/tasks/project/${projectId}?${params}`);
   },
-  getMyTasks: () => request("/tasks/my"),
+  getMyTasks: (filters = {}) => {
+    const params = new URLSearchParams(filters);
+    return request(`/tasks/my${params.toString() ? `?${params}` : ""}`);
+  },
+
   getPrioritized: () => request("/tasks/prioritized"),
   updateStatus: (id, status) =>
     request(`/tasks/${id}/status`, { method: "PUT", body: JSON.stringify({ status }) }),

@@ -25,6 +25,8 @@ import FreelancerProjects from "./pages/freelancer/Projects";
 import FreelancerTasks from "./pages/freelancer/Tasks";
 import FreelancerTimesheets from "./pages/freelancer/Timesheets";
 import FreelancerInvoices from "./pages/freelancer/Invoices";
+import FreelancerPayroll from "./pages/freelancer/Payroll";
+
 
 export default function App() {
   return (
@@ -65,6 +67,8 @@ export default function App() {
           <Route path="/freelancer/tasks"      element={<FreelancerTasks />} />
           <Route path="/freelancer/timesheets" element={<FreelancerTimesheets />} />
           <Route path="/freelancer/invoices"   element={<FreelancerInvoices />} />
+          <Route path="/freelancer/payroll"     element={<FreelancerPayroll />} />
+
         </Route>
 
         <Route path="*"                      element={<NotFound />} />

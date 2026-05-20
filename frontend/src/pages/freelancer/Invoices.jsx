@@ -52,6 +52,8 @@ export default function FreelancerInvoices() {
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Invoices</h1>
           <p className="mt-2 text-sm text-slate-500">Billing history, payment state, and issued totals.</p>
         </div>
+
+
         {error ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
             {error}

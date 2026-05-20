@@ -198,6 +198,21 @@ export const payrollApi = {
   downloadPayslip: (id) => requestBlob(`/payroll/${id}/payslip`),
 };
 
+export const freelancerPayrollApi = {
+  generateBulk: (month) =>
+    request("/freelancer-payroll/generate-bulk", {
+      method: "POST",
+      body: JSON.stringify({ month }),
+    }),
+  getAll: (filters = {}) => {
+    const params = new URLSearchParams(filters);
+    return request(`/freelancer-payroll?${params}`);
+  },
+  getMine: () => request("/freelancer-payroll/my"),
+};
+
+
+
 // ── Performance Reviews ───────────────────────────────────────────────────────
 export const performanceApi = {
   create: (payload) =>

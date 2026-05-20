@@ -12,12 +12,14 @@ import taskRoutes             from "./taskRoutes.js";
 import timesheetRoutes        from "./timesheetRoutes.js";
 import invoiceRoutes          from "./invoiceRoutes.js";
 import payrollRoutes          from "./payrollRoutes.js";
+import freelancerPayrollRoutes from "./freelancerPayrollRoutes.js";
 import performanceReviewRoutes from "./performancereviewRoutes.js";
 import documentRoutes         from "./documentRoutes.js";
 import analyticsRoutes        from "./analyticsRoutes.js";
 import notificationRoutes     from "./notificationRoutes.js";
 
 const router = express.Router();
+
 
 router.use("/auth",                authRoutes);
 
@@ -32,7 +34,9 @@ router.use("/tasks",               taskRoutes);
 router.use("/timesheets",          timesheetRoutes);
 router.use("/invoices",            invoiceRoutes);
 router.use("/payroll",             payrollRoutes);
+router.use("/freelancer-payroll", freelancerPayrollRoutes);
 router.use("/performance-reviews", performanceReviewRoutes);
+
 router.use("/documents",           documentRoutes);
 router.use("/notifications",      notificationRoutes);
 router.use("/analytics",           analyticsRoutes);
